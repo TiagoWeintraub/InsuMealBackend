@@ -1,0 +1,11 @@
+fastapi==0.115.12
+uvicorn==0.34.1
+httpx==0.28.1
+python-dotenv
+sqlmodel
+fastapi
+fastapi-mail
+fastapi-jwt-auth
+google-generativeai
+pillow
+python-multipart

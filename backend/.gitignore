@@ -1,0 +1,10 @@
+# Ignora todos los archivos DS_Store
+.DS_Store
+# Ignora todos los archivos de caché de Python
+__pycache__/
+# Ignora el entorno virtual con carpetas bin, lib y include
+bin/
+lib/
+include/
+# Ignora el archivo de configuración de entorno virtual
+.env
