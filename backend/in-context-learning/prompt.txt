@@ -12,7 +12,7 @@ Example with an image showing 3 empanadas:
 food = {"Empanada": 3}
 
 Example with an Argentinian Milanese:
-food = {"Milanese steak": 1}
+food = {"Meat Milanese": 1}
 
 Example where a double-meat burger with lettuce, tomato, and other items appears, you just need to enter the generic category:
 food = {“hamburger”: 1}
@@ -23,14 +23,23 @@ food = {“Food General Name”: instances that food item appears, “portion ty
 
 The weight should be calculated as:
 average_weight_of_a_portion × number of times the food item appears in the image
-Example:
-- If there is a hamburger that has 2 slices of tomato that weigh on average ~20g each, there are 2 buns and 2 hamburger patties weighing ~100g each on average, 2 lettuce leaves weighing ~10g each on average, and 2 slices of cheddar cheese weighing ~20g each on average, then you have to return the following dictionary: 
-`food = {“hamburger”:1, "hamburger bun": 200, "hamburger meat": 200, "tomato slice": 40, "lettuce leaf": 20, "cheese": 40}`
+Example 1:
+- If there is a hamburger that has 2 slices of tomato that weigh on average ~20g each, 1 hamburger bun (meaning the top and bottom layers make up 1 bun) with the entire bun weighing 100g on average, 2 hamburger patties weighing ~100g each on average, 2 lettuce leaves weighing ~10g each on average, and 2 slices of cheddar cheese weighing ~20g each on average, then you have to return the following dictionary: 
+`food = {“hamburger”:1, "hamburger bun": 100, "hamburger meat": 200, "tomato slice": 40, "lettuce leaf": 20, "cheese": 40}`
+
+Example 2:
+- If there is a meat Milanese (can be chicken) with mashed potatoes (or pumpkin), then the meat weighs an average of ~120g, the breadcrumbs average ~25g and the mashed potatoes weigh an average of ~180g., then you have to return the following dictionary: 
+`food = {Meat Milanese:1, "Meat": 120, "breadcrumbs": 25, "mashed potatoes": 180}`
+
+Remember that the weights I gave you are an example, you must place them according to the image
 
 Common cases where you should break down food items:
 - Pizza: pizza dough, cheese, tomato sauce, pepperoni slices, vegetables, etc.
 - Pasta: pasta type (noodles, spaghetti, ravioli, or sorrentino), Bolognese sauce, grated cheese, etc.
 - Empanadas: empanada dough, minced meat, onion, hard-boiled egg, olives, etc.
+- Proteins and Milanese
+
+Important: If you don't know exactly what sauce or food is identified in the image, it's best not to enter it in the dictionary. Only enter the sauce or food if you know exactly what it is.
 
 Only returns the dictionary `food = {...}`. If no food item is detected, returns:
 
