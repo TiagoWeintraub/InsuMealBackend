@@ -1,4 +1,8 @@
 1 Instalar todas las dependencias del requirements.txt en el entorno virtual
 
-2 Levantar el server:
+2 Verificar servicio de postgres
+ps aux | grep postgres
+
+3 Levantar el server:
 uvicorn main:app --reload
+

@@ -1,50 +1,46 @@
-# from sqlmodel import SQLModel, Field
-# from typing import Optional
+from sqlmodel import SQLModel, Field
+from typing import Optional
 
-# class Usuario(SQLModel, table=True):
-#     id: Optional[int] = Field(default=None, primary_key=True)
-#     dni: int
-#     email: str
-#     nombre: str
-#     apellido: str
-#     contrasena: str = Field(..., alias="contraseña")
-#     telefono: int
+class User(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    email: str
+    name: str
+    lastName: str
+    password: str = Field(..., alias="password")
 
-#     @property
-#     def plain_contrasena(self):
-#         raise AttributeError('Contraseña no puede ser leída')
+    @property
+    def plain_password(self):
+        raise AttributeError('Contraseña no puede ser leída')
 
-#     @plain_contrasena.setter
-#     def plain_contrasena(self, contrasena: str):
-#         # self.contrasena = generate_password_hash(contrasena)
-#         pass
+    @plain_password.setter
+    def plain_password(self, password: str):
+        # self.password = generate_password_hash(password)
+        pass
 
-#     def validate_pass(self, contrasena: str) -> bool:
-#         # return check_password_hash(self.contrasena, contrasena)
-#         pass
+    def validate_pass(self, password: str) -> bool:
+        # return check_password_hash(self.password, password)
+        pass
 
-#     def __repr__(self):
-#         return f"<Usuario {self.nombre} {self.apellido} ({self.telefono}, {self.email})>"
+    def __repr__(self):
+        return f"<User {self.name} {self.lastName}, {self.email})>"
 
-#     def to_json(self):
-#         return {
-#             'id': self.id,
-#             'dni': self.dni,
-#             'nombre': self.nombre,
-#             'apellido': self.apellido,
-#             'telefono': self.telefono,
-#             'email': self.email,
-#             'contraseña': self.contrasena
-#         }
+    def to_json(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'lastName': self.lastName,
+            'email': self.email,
+            'password': self.password
+        }
 
-#     @staticmethod
-#     def from_json(usuarios_json):
-#         return Usuario(
-#             id=usuarios_json.get('id'),
-#             dni=usuarios_json.get('dni'),
-#             nombre=usuarios_json.get('nombre'),
-#             apellido=usuarios_json.get('apellido'),
-#             contrasena=usuarios_json.get('contraseña'),
-#             telefono=usuarios_json.get('telefono'),
-#             email=usuarios_json.get('email')
-#         )
+    @staticmethod
+    def from_json(users_json):
+        return User(
+            id=users_json.get('id'),
+            dni=users_json.get('dni'),
+            name=users_json.get('name'),
+            lastName=users_json.get('lastName'),
+            password=users_json.get('password'),
+            telefono=users_json.get('telefono'),
+            email=users_json.get('email')
+        )

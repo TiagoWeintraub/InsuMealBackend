@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from sqlmodel import Session, select
-# from models.usuario import Usuario
+from models.usuario import Usuario
 # from models.historial import Historial
-# from database import get_session
+from database import get_session
 from resources.geminiResource import GeminiResource
 
 router = APIRouter()
@@ -15,13 +15,13 @@ async def analyze_image(file: UploadFile = File(...)):
     return {"result": result}
 
 
-# @router.post("/usuarios/")
-# async def create_user(usuario: Usuario):
-#     with get_session() as session:
-#         session.add(usuario)
-#         session.commit()
-#         session.refresh(usuario)
-#         return usuario
+@router.post("/usuarios/")
+async def create_user(usuario: Usuario):
+    with get_session() as session:
+        session.add(usuario)
+        session.commit()
+        session.refresh(usuario)
+        return usuario
 
 
 # @router.get("/historial/{usuario_id}")
