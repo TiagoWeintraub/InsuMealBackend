@@ -6,3 +6,17 @@ ps aux | grep postgres
 3 Levantar el server:
 uvicorn main:app --reload
 
+Así está organizada la estructura de mi proyecto: backend/
+├── routes/
+│       └── user.py         ← Solo define rutas y usa los recursos
+├── resources/
+│   └── userResource.py    ← Contiene la lógica (crear, editar, etc.)
+├── schemas/
+│   └── userSchema.py      ← Define UserCreate, UserRead, etc.
+├── models/
+│   └── user.py             ← Modelo SQLModel (User)
+├── auth/
+│   └── jwt_handler.py
+│   └── dependencies.py
+├── database.py
+│── main.py
