@@ -1,108 +1,92 @@
-from sqlmodel import SQLModel, Field
-from werkzeug.security import generate_password_hash, check_password_hash
-from typing import Optional
-
-from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
-from typing import List
-from backend.models.user import User
-from backend.auth.jwt_handler import create_access_token
-from backend.auth.dependencies import get_current_user
-from backend.database import get_session  
-from pydantic import BaseModel, EmailStr
+from fastapi import HTTPException, status
+from models.user import User
+from auth.jwt_handler import create_access_token
+from schemas.user_schema import UserCreate, UserUpdate, PasswordChange, LoginInput
+from schemas.clinical_data_schema import ClinicalDataCreate
+from resources.clinical_data_resource import ClinicalDataResource
+from schemas.food_history_schema import FoodHistoryCreate
+from resources.food_history_resource import FoodHistoryResource
 
-router = APIRouter(prefix="/users", tags=["Users"])
-
-### SCHEMAS ###
-
-class UserCreate(BaseModel):
-    name: str
-    lastName: str
-    email: EmailStr
-    password: str
-    idClinicalData: int
-
-
-class UserRead(BaseModel):
-    id: int
-    name: str
-    lastName: str
-    email: EmailStr
-
-
-class UserUpdate(BaseModel):
-    name: str
-    lastName: str
-
-
-class PasswordChange(BaseModel):
-    old_password: str
-    new_password: str
-
-
-class LoginInput(BaseModel):
-    email: EmailStr
-    password: str
-
-
-### ENDPOINTS ###
-
-@router.post("/", response_model=UserRead)
-def create_user(data: UserCreate, session: Session = Depends(get_session)):
-    existing = session.exec(select(User).where(User.email == data.email)).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Email ya registrado")
-
-    user = User.from_json(data.dict())
-    session.add(user)
-    session.commit()
-    session.refresh(user)
-    return user.to_json()
-
-
-@router.get("/", response_model=List[UserRead])
-def get_users(session: Session = Depends(get_session)):
-    return [user.to_json() for user in session.exec(select(User)).all()]
-
-
-@router.get("/me", response_model=UserRead)
-def get_me(current_user: User = Depends(get_current_user)):
-    return current_user.to_json()
-
-
-@router.put("/", response_model=UserRead)
-def update_user(data: UserUpdate, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
-    current_user.name = data.name
-    current_user.lastName = data.lastName
-    session.add(current_user)
-    session.commit()
-    session.refresh(current_user)
-    return current_user.to_json()
-
-
-@router.delete("/", status_code=204)
-def delete_user(current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
-    session.delete(current_user)
-    session.commit()
-
-
-@router.post("/change-password")
-def change_password(data: PasswordChange, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
-    if not current_user.validate_pass(data.old_password):
-        raise HTTPException(status_code=403, detail="Contraseña actual incorrecta")
-
-    current_user.plain_password = data.new_password
-    session.add(current_user)
-    session.commit()
-    return {"msg": "Contraseña actualizada exitosamente"}
-
-
-@router.post("/login")
-def login(data: LoginInput, session: Session = Depends(get_session)):
-    user = session.exec(select(User).where(User.email == data.email)).first()
-    if not user or not user.validate_pass(data.password):
-        raise HTTPException(status_code=400, detail="Credenciales inválidas")
-
-    token = create_access_token({"sub": str(user.id)})
-    return {"access_token": token, "token_type": "bearer"}
+class UserResource:
     
+    @staticmethod
+    def create_user(data: UserCreate, session: Session) -> User:
+        # Verifica si ya existe el email
+        if UserResource.get_user_by_email(data.email, session):
+            raise HTTPException(status_code=400, detail="Email ya registrado")
+        
+        # 1. Crear primero el usuario sin relaciones
+        user = User(
+            name=data.name,
+            lastName=data.lastName,
+            email=data.email
+        )
+        user.plain_password = data.password
+
+        session.add(user)
+        session.commit()
+        session.refresh(user)  # Ahora user.id está asignado
+        
+        # 2. Crear ClinicalData asociándoselo al usuario
+        clinical_data_resource = ClinicalDataResource(session)
+        clinical_data = clinical_data_resource.create(
+            ClinicalDataCreate(ratio=0.0, sensitivity=0.0, user_id=user.id)
+        )
+        
+        # 3. Crear FoodHistory asociándoselo al usuario
+        food_history_resource = FoodHistoryResource(session)
+        food_history = food_history_resource.create(
+            FoodHistoryCreate(info="Información de historial alimenticio inicial", user_id=user.id)
+        )
+        
+        # (Opcional) Si en el modelo User tienes campos explícitos para guardar estos ids,
+        # podrías actualizar el usuario. En nuestro modelo se manejan a través de relationships.
+        
+        return user
+
+    @staticmethod
+    def get_all_users(session: Session): 
+        return session.exec(select(User)).all()
+    
+    @staticmethod
+    def get_user_by_email(email: str, session: Session):
+        # Retorna el usuario si existe, sino retorna None
+        return session.exec(select(User).where(User.email == email)).first()
+
+    # ... (el resto de métodos permanece igual)
+    @staticmethod
+    def update_user(data: UserUpdate, current_user: User, session: Session):
+        current_user.name = data.name
+        current_user.lastName = data.lastName
+        session.add(current_user)
+        session.commit()
+        session.refresh(current_user)
+        return current_user
+
+    @staticmethod
+    def delete_by_id(user_id: int, session: Session):
+        user = session.get(User, user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        session.delete(user)
+        session.commit()
+        return {"msg": "Usuario eliminado exitosamente"}
+
+    @staticmethod
+    def change_password(data: PasswordChange, current_user: User, session: Session):
+        if not current_user.validate_pass(data.old_password):
+            raise HTTPException(status_code=403, detail="Contraseña actual incorrecta")
+        current_user.plain_password = data.new_password
+        session.add(current_user)
+        session.commit()
+        return {"msg": "Contraseña actualizada exitosamente"}
+
+    @staticmethod
+    def login_user(data: LoginInput, session: Session):
+        user = session.exec(select(User).where(User.email == data.email)).first()
+        if not user or not user.validate_pass(data.password):
+            raise HTTPException(status_code=400, detail="Credenciales inválidas")
+        
+        token = create_access_token({"sub": str(user.id)})
+        return {"access_token": token, "token_type": "bearer", "user_id": user.id}

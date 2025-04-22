@@ -1,9 +1,9 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from backend.auth.jwt_handler import decode_access_token
-from backend.models.user import User
+from auth.jwt_handler import decode_access_token
+from models.user import User
 from sqlmodel import Session, select
-from backend.database import get_session  # Tu función de sesión
+from database import get_session  # Tu función de sesión
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
 

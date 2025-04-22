@@ -1,29 +1,20 @@
-from typing import Optional, List
+from typing import TYPE_CHECKING, List, Optional
 from sqlmodel import SQLModel, Field, Relationship
-from backend.models.meal_plate import MealPlate 
-from backend.models.meal_plate_ingredient import MealPlateIngredient
+from .meal_plate_ingredient import MealPlateIngredient
 
+if TYPE_CHECKING:
+    from .meal_plate import MealPlate
 
 class Ingredient(SQLModel, table=True):
-    id: int = Field(default=None, primary_key=True)
-    name: str
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(index=True)
     carbsPerHundredgrams: float
 
-    mealplates: List["MealPlate"] = Relationship(
-        back_populates="ingredients", link_model=MealPlateIngredient
+    # Relación bidireccional Muchos-a-Muchos con MealPlate
+    meal_plates: List["MealPlate"] = Relationship(
+        back_populates="ingredients",
+        link_model=MealPlateIngredient 
     )
 
-    # def to_json(self):
-    #     return {
-    #         "id": self.id,
-    #         "name": self.name,
-    #         "carbsPerHundredgrams": self.carbsPerHundredgrams,
-    #     }
-
-    # @staticmethod
-    # def from_json(data: dict) -> "Ingredient":
-    #     return Ingredient(
-    #         id=data.get("id"),
-    #         name=data.get("name"),
-    #         carbsPerHundredgrams=data.get("carbsPerHundredgrams"),
-    #     )
+    def __repr__(self):
+        return f"<Ingredient id={self.id}, name='{self.name}'>"
