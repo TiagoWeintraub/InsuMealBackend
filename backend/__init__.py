@@ -14,7 +14,7 @@ load_dotenv()
 
 app = FastAPI()
 
-#drop_db()  # Descomentar para borrar la base de datos antes de crearla
+# drop_db()  # Descomentar para borrar la base de datos antes de crearla
 
 inspector() 
 

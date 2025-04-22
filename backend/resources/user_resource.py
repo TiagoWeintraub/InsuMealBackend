@@ -37,12 +37,9 @@ class UserResource:
         # 3. Crear FoodHistory asociándoselo al usuario
         food_history_resource = FoodHistoryResource(session)
         food_history = food_history_resource.create(
-            FoodHistoryCreate(info="Información de historial alimenticio inicial", user_id=user.id)
+            FoodHistoryCreate(user_id=user.id)
         )
-        
-        # (Opcional) Si en el modelo User tienes campos explícitos para guardar estos ids,
-        # podrías actualizar el usuario. En nuestro modelo se manejan a través de relationships.
-        
+
         return user
 
     @staticmethod
@@ -53,6 +50,14 @@ class UserResource:
     def get_user_by_email(email: str, session: Session):
         # Retorna el usuario si existe, sino retorna None
         return session.exec(select(User).where(User.email == email)).first()
+
+    @staticmethod
+    def get_user_by_id(user_id: int, session: Session):
+        # Retorna el usuario si existe, sino retorna None
+        user = session.get(User, user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        return user
 
     # ... (el resto de métodos permanece igual)
     @staticmethod

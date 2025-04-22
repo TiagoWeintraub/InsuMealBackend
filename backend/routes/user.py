@@ -20,6 +20,12 @@ def get_all(session: Session = Depends(get_session)):
 def me(current_user: User = Depends(get_current_user)):
     return current_user
 
+@router.get("/get_by_id/{user_id}", response_model=UserRead)
+def get_by_id(user_id: int, session: Session = Depends(get_session)):
+    user = UserResource.get_user_by_id(user_id, session)
+    if not user:
+        return {"message": "User not found"}
+    return user
 
 @router.put("/put", response_model=UserRead)
 def update(data: UserUpdate, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):

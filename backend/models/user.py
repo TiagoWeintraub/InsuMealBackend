@@ -13,12 +13,22 @@ class User(SQLModel, table=True):
     email: str = Field(unique=True, index=True) 
     password: str 
 
-    # Relación bidireccional 1-a-1 con ClinicalData
-    clinical_data: Optional["ClinicalData"] = Relationship(back_populates="user")
-
-    # Relación bidireccional 1-a-Muchos con FoodHistory
-    food_history: Optional["FoodHistory"] = Relationship(back_populates="user")
-
+    # Relación 1-a-1 con ClinicalData con cascade delete
+    clinical_data: Optional["ClinicalData"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={
+            "uselist": False,
+            "cascade": "all, delete"
+        }
+    )
+    # FoodHistory 1-a-1:
+    food_history: Optional["FoodHistory"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={
+            "uselist": False,
+            "cascade": "all, delete"
+        }
+    )
     @property
     def plain_password(self):
         raise AttributeError("La contraseña no puede ser leída directamente")

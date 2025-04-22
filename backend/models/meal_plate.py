@@ -1,9 +1,8 @@
 from typing import TYPE_CHECKING, Optional, List
 from sqlmodel import SQLModel, Field, Relationship
-# Importar la clase real de la tabla de enlace
 from .meal_plate_ingredient import MealPlateIngredient
-# Importaciones SQLAlchemy para definición explícita de columnas
-from sqlalchemy import Column, ForeignKey, Integer, String, LargeBinary, Float
+from datetime import datetime
+from sqlalchemy import Column, ForeignKey, Integer, String, LargeBinary, Float, DateTime, func
 
 if TYPE_CHECKING:
     from .ingredient import Ingredient
@@ -15,6 +14,16 @@ class MealPlate(SQLModel, table=True):
     type: str = Field(...)
     totalCarbs: Optional[float] = Field(default=None)
     dosis: Optional[float] = Field(default=None)
+
+    # Campo de fecha con valor por defecto generado por la BD
+    date: datetime = Field(
+        sa_column=Column(
+            DateTime(timezone=True),
+            server_default=func.now(),
+            nullable=False,
+            index=True 
+        )
+    )
 
     food_history_id: Optional[int] = Field(
         default=None, 

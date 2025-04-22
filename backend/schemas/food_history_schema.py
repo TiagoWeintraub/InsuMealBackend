@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
 class FoodHistoryBase(BaseModel):
-    description: str
+    pass 
 
 class FoodHistoryCreate(FoodHistoryBase):
     user_id: int  

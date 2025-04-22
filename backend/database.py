@@ -7,6 +7,7 @@ from models.ingredient import Ingredient
 from models.meal_plate_ingredient import MealPlateIngredient
 from models.meal_plate import MealPlate
 from models.user import User
+from sqlalchemy import text
 
 load_dotenv()
 
@@ -22,15 +23,18 @@ def init_db():
     except Exception as e:
         print(f"\nError al crear tablas (puede que ya existieran): {e}")
 
+
 def drop_db():
-    """Elimina todas las tablas definidas en los modelos usando SQLModel."""
+    """Elimina todas las tablas y objetos usando DROP SCHEMA CASCADE en PostgreSQL."""
     try:
-        print("Intentando eliminar tablas...")
-        SQLModel.metadata.drop_all(engine)
-        print("\nTablas eliminadas.")
+        print("Intentando eliminar esquema público con CASCADE...")
+        with engine.connect() as conn:
+            conn.execute(text("DROP SCHEMA public CASCADE;"))
+            conn.execute(text("CREATE SCHEMA public;"))
+            conn.commit()
+        print("\nEsquema eliminado y recreado.")
     except Exception as e:
-        # Captura errores si las tablas no existen o hay problemas
-        print(f"\nError al eliminar tablas (puede que no existieran): {e}")
+        print(f"\nError al eliminar esquema: {e}")
 
 def get_session():
     with Session(engine) as session:

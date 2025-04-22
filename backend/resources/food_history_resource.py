@@ -8,7 +8,7 @@ class FoodHistoryResource:
         self.session = session
 
     def create(self, data: FoodHistoryCreate) -> FoodHistory:
-        food_history = FoodHistory(**data.model_dump()())
+        food_history = FoodHistory(**data.model_dump())
         self.session.add(food_history)
         self.session.commit()
         self.session.refresh(food_history)
@@ -21,7 +21,7 @@ class FoodHistoryResource:
         food_history = self.session.get(FoodHistory, food_history_id)
         if not food_history:
             raise HTTPException(status_code=404, detail="FoodHistory no encontrado")
-        for key, value in data.model_dump()().items():
+        for key, value in data.model_dump().items():
             setattr(food_history, key, value)
         self.session.add(food_history)
         self.session.commit()

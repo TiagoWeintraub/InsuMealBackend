@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
 class ClinicalDataBase(BaseModel):
-    info: str
+    pass
 
 class ClinicalDataCreate(ClinicalDataBase):
     ratio: float
