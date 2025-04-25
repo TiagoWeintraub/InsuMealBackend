@@ -1,4 +1,4 @@
-I'm going to send you photos of food dishes. My goal is to obtain a Python dictionary where the first key-value pair is: general food type detected in the image: instances that feature the general food in the image. The following elements are: the key, atomically or individually, food items detected in the image, and the values, the approximate quantities (in grams) of each of the detected foods. I can then query the Edamam API for nutritional information on each of the detected foods. Therefore, the detected foods must exist in the API.
+I'm going to send you photos of food dishes. My goal is to obtain a Python dictionary where the first key-value pair is: general food type detected in the image: instances that feature the general food in the image. The following elements are: the key, atomically or individually, food items detected in the image, and the values, the approximate average weights (in grams) of each of the detected foods. I can then query the Edamam API for nutritional information on each of the detected foods. Therefore, the detected foods must exist in the API.
 
 To do this, you must return a Python dictionary that follows these rules:
 The first key-value pair in the dictionary is keyed to the type of food: If it's a margherita pizza, return only pizza; if there's a triple burger with fries, return only a burger; if there's ravioli with bolognese, return ravioli; if there's empanadas, return empanada.
@@ -17,24 +17,51 @@ food = {"Meat Milanese": 1}
 Example where a double-meat burger with lettuce, tomato, and other items appears, you just need to enter the generic category:
 food = {“hamburger”: 1}
 
+Example with Scrambled Rice:
+food = {"Scrambled Rice": 1}
+
 If the food item is detected, such as a hamburger, where the meat, tomato, etc. are visible, then the next elements of the dictionary will follow the following format: “Food on the plate”: instances that food item appears:
 
 food = {“Food General Name”: instances that food item appears, “portion type + food name1”: average_weight_of_a_portion_of_food1, “portion type + food name2”: average_weight_of_a_portion_of_food2}
 
 The weight should be calculated as:
 average_weight_of_a_portion × number of times the food item appears in the image
-Example 1:
-- If there is a hamburger that has 2 slices of tomato that weigh on average ~20g each, 1 hamburger bun (meaning the top and bottom layers make up 1 bun) with the entire bun weighing 100g on average, 2 hamburger patties weighing ~100g each on average, 2 lettuce leaves weighing ~10g each on average, and 2 slices of cheddar cheese weighing ~20g each on average, then you have to return the following dictionary: 
-`food = {“hamburger”:1, "hamburger bun": 100, "hamburger meat": 200, "tomato slice": 40, "lettuce leaf": 20, "cheese": 40}`
 
-Example 2:
+You should always take AVERAGE weights of each food individually
+
+Example 1: Hamburger
+- If there is a hamburger that has 2 tomato slices that weigh on average ~20g each, 1 hamburger bun (meaning the top and bottom layers form 1 bun) that weighs on average 100g, 1 hamburger patty that weighs ~100g the patty, 2 lettuce leaves that weigh ~10g each on average, and 2 cheddar cheese slices that weigh ~20g each on average, then you have to return the following dictionary:
+food = {“hamburger”:1, "hamburger bun": 100, "hamburger meat": 200, "tomato slice": 40, "lettuce": 20, "cheese": 40}
+Note: If 2 meats were detected, it would be 200 grams of hamburger meat. 
+
+Example 2: Milanese with Mashed Potatoes
 - If there is a meat Milanese (can be chicken) with mashed potatoes (or pumpkin), then the meat weighs an average of ~120g, the breadcrumbs average ~25g and the mashed potatoes weigh an average of ~180g., then you have to return the following dictionary: 
-`food = {Meat Milanese:1, "Meat": 120, "breadcrumbs": 25, "mashed potatoes": 180}`
+food = {Meat Milanese:1, "Meat": 120, "breadcrumbs": 25, "mashed potatoes": 180}
 
-Remember that the weights I gave you are an example, you must place them according to the image
+Example 3: Pizza
+- If there is a pizza with pizza dough weighing ~200g on average, cheese weighing ~150g on average, tomato sauce weighing ~100g on average, 10 slices of pepperoni weighing ~5g each on average, then you have to return the following dictionary:
+food = {"pizza":1, "pizza dough": 200, "cheese": 150, "tomato sauce": 100, "pepperoni slice": 50}
+
+Example 4: Pasta
+- If there is a pasta dish with spaghetti weighing ~250g on average, Bolognese sauce weighing ~200g on average, and grated cheese weighing ~30g on average, then you have to return the following dictionary:
+food = {"pasta":1, "spaghetti": 250, "Bolognese sauce": 200, "grated cheese": 30}
+
+Example 5: Empanadas
+- If there is an empanada with empanada dough weighing ~50g on average, minced meat weighing ~80g on average, onion weighing ~20g on average, hard-boiled egg weighing ~30g on average, and olives weighing ~10g on average, then you have to return the following dictionary:
+food = {"empanada":1, "empanada dough": 50, "minced meat": 40, "onion": 20, "hard-boiled egg": 30, "olives": 10}
+
+Example 6: Grilled Chicken with White Rice 
+If there is a grilled chicken breast weighing ~150g on average, served with rice weighing ~200g on average, then you have to return the following dictionary:
+food = {"grilled chicken":1, "chicken breast": 150, "White rice": 200}
+
+Example 7: Beef Milanese with baked potatoes
+If there is a beef Milanese with the meat weighing ~130g on average, breadcrumbs weighing ~30g on average, and mashed potatoes weighing ~200g on average, then you have to return the following dictionary:
+food = {"beef milanese":1, "beef": 130, "breadcrumbs": 30, "mashed potatoes": 200}
+
+Remember that the weights I gave you are an example, you must place them according to the image but always take AVERAGE weights of each food individually.
 
 Common cases where you should break down food items:
-- Pizza: pizza dough, cheese, tomato sauce, pepperoni slices, vegetables, etc.
+- Pizza: pizza dough, cheese, tomato sauce, pepperoni slices, etc.
 - Pasta: pasta type (noodles, spaghetti, ravioli, or sorrentino), Bolognese sauce, grated cheese, etc.
 - Empanadas: empanada dough, minced meat, onion, hard-boiled egg, olives, etc.
 - Proteins and Milanese

@@ -14,6 +14,12 @@ class FoodHistoryResource:
         self.session.refresh(food_history)
         return food_history
 
+    def get_by_user_id(self, user_id: int):
+        food_history = self.session.exec(select(FoodHistory).where(FoodHistory.user_id == user_id)).first()
+        if not food_history:
+            raise HTTPException(status_code=404, detail="FoodHistory no encontrado")
+        return food_history
+
     def get_all(self):
         return self.session.exec(select(FoodHistory)).all()
 

@@ -33,6 +33,11 @@ class GeminiResource:
             
             food_text_dic = self.clean_data(response.text)
             
+            # Este food dict se debe enviar al recurso de Edamam,
+            # Se debe crear un meal plate y asociarlo al historial de comidas del usuario
+            # cada alimento de edamam se debe guardar en la base de datos como ingrediente
+
+            
             return food_text_dic
 
         except Exception as e:
@@ -108,8 +113,8 @@ class GeminiResource:
             print(f"Peso final: {final_size_kb:.2f} KB con calidad {quality}")
             print(f"Dimensiones finales: {image.size}")
 
-        with open("imagen_comprimida.jpg", "wb") as f:
-            f.write(compressed_data)
+        # with open("imagen_comprimida.jpg", "wb") as f: # Guardamos la imagen comprimida
+        #     f.write(compressed_data) 
 
         return compressed_data
 

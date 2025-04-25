@@ -10,34 +10,32 @@ from resources.user_resource import UserResource
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
-
-@router.get("/get/users", response_model=List[UserRead]) # Trae todos los usuarios
-def get_all(session: Session = Depends(get_session)):
+@router.get("/", response_model=List[UserRead])
+def get_all(current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     return UserResource.get_all_users(session)
 
 
-@router.get("/me", response_model=UserRead)
-def me(current_user: User = Depends(get_current_user)):
-    return current_user
-
 @router.get("/get_by_id/{user_id}", response_model=UserRead)
-def get_by_id(user_id: int, session: Session = Depends(get_session)):
+def get_by_id(user_id: int, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     user = UserResource.get_user_by_id(user_id, session)
     if not user:
         return {"message": "User not found"}
     return user
 
-@router.put("/put", response_model=UserRead)
-def update(data: UserUpdate, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
-    return UserResource.update_user(data, current_user, session)
+@router.get("/all", response_model=List[UserRead])
+def get_all_users(current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    return UserResource.get_all_users(session)
 
+# @router.put("/put", response_model=UserRead) No sé si es necesario
+# def update(data: UserUpdate, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+#     return UserResource.update_user(data, current_user, session)
 
 @router.delete("/delete", status_code=204)
 def delete(current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     UserResource.delete_user(current_user, session)
 
 @router.delete("/delete_by_id/{user_id}", status_code=200)
-def delete_user_by_id(user_id: int, session: Session = Depends(get_session)):
+def delete_user_by_id(user_id: int, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     return UserResource.delete_by_id(user_id, session)
 
 @router.post("/change-password")

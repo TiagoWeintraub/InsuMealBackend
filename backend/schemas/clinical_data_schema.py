@@ -10,4 +10,5 @@ class ClinicalDataCreate(ClinicalDataBase):
 
 
 class ClinicalDataUpdate(ClinicalDataBase):
-    pass
+    ratio: float
+    sensitivity: float

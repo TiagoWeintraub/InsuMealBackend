@@ -16,6 +16,12 @@ class ClinicalDataResource:
 
     def get_all(self):
         return self.session.exec(select(ClinicalData)).all()
+    
+    def get_by_user_id(self, user_id: int):
+        clinical_data = self.session.exec(select(ClinicalData).where(ClinicalData.user_id == user_id)).first()
+        if not clinical_data:
+            raise HTTPException(status_code=404, detail="ClinicalData no encontrado")
+        return clinical_data
 
     def update(self, clinical_data_id: int, data: ClinicalDataUpdate) -> ClinicalData:
         clinical_data = self.session.get(ClinicalData, clinical_data_id)
