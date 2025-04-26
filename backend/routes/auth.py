@@ -10,7 +10,7 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
 @router.post("/register", response_model=UserRead)
-def register(data: UserCreate, session: Session = Depends(get_session)):
+async def register(data: UserCreate, session: Session = Depends(get_session)):
     existing = UserResource.get_user_by_email(data.email, session)
     if existing:
         raise HTTPException(status_code=400, detail="Email ya registrado")
@@ -20,5 +20,5 @@ def register(data: UserCreate, session: Session = Depends(get_session)):
 
 
 @router.post("/login")
-def login(data: LoginInput, session: Session = Depends(get_session)):
+async def login(data: LoginInput, session: Session = Depends(get_session)):
     return UserResource.login_user(data, session)

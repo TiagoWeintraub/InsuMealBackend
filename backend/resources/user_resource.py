@@ -34,11 +34,18 @@ class UserResource:
             ClinicalDataCreate(ratio=0.0, sensitivity=0.0, user_id=user.id)
         )
         
+        session.add(clinical_data)
+        session.commit()
+        session.refresh(clinical_data)
+        
         # 3. Crear FoodHistory asociándoselo al usuario
         food_history_resource = FoodHistoryResource(session)
         food_history = food_history_resource.create(
             FoodHistoryCreate(user_id=user.id)
         )
+        session.add(food_history)
+        session.commit()
+        session.refresh(food_history)
 
         return user
 

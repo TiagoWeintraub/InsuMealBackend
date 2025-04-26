@@ -9,12 +9,12 @@ from models.user import User
 router = APIRouter(prefix="/clinical_data", tags=["clinical_data"])
 
 @router.get("/")
-def read_clinical_data(current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+async def read_clinical_data(current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     resource = ClinicalDataResource(session)
     return resource.get_all()
 
 @router.put("/{clinical_data_id}")
-def update_clinical_data(clinical_data_id: int, data: ClinicalDataUpdate, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+async def update_clinical_data(clinical_data_id: int, data: ClinicalDataUpdate, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     resource = ClinicalDataResource(session)
     return resource.update(clinical_data_id, data)
 
