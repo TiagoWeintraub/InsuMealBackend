@@ -7,11 +7,13 @@ from dotenv import load_dotenv
 from typing import Union
 import re
 from sqlmodel import Session
-from schemas.meal_plate_schema import MealPlateCreate
 from resources.meal_plate_resource import MealPlateResource
-from schemas.food_history_schema import FoodHistoryCreate
-from resources.food_history_resource import FoodHistoryResource
 from models.user import User
+from fastapi import HTTPException
+from models.food_history import FoodHistory
+import imghdr
+from sqlmodel import select
+
 
 load_dotenv()
 
@@ -23,6 +25,8 @@ class GeminiResource:
             raise ValueError("GEMINI_API_KEY no está definido en el .env")
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel("gemini-2.0-flash-lite")
+
+
 
     def analyze_image(self, image_data: bytes, current_user: User) -> Union[str, dict]:
         try:
@@ -39,19 +43,29 @@ class GeminiResource:
             response = self.model.generate_content([image, prompt])
             
             food_text_dic = self.clean_data(response.text)
+
+            # Se busca el FoodHistory del usuario
+            food_history = self.session.exec(
+                select(FoodHistory).where(FoodHistory.user_id == current_user.id)
+            ).first()
             
-            # Se crea el meal_plate sin asignar un valor genérico en "type" ni la fecha,
-            # de modo que la BD asigne automáticamente la fecha de creación.
-            # También se asigna el food_history del usuario actual.
+            if not food_history:
+                raise HTTPException(status_code=404, detail="No se encontró historial de comidas para este usuario.")
+
+            # Detectar automáticamente el mime_type
+            detected_type = imghdr.what(None, imagen)
+            mime_type = f"image/{detected_type}" if detected_type else "application/octet-stream"
+
             meal_plate_resource = MealPlateResource(self.session)
-            meal_plate = meal_plate_resource.create(
-                MealPlateCreate(
-                    picture=image_data,
-                    type="",  # Se deja vacío para no asignar un valor genérico.
-                    food_history_id=current_user.food_history.id
-                )
+            meal_plate_resource.create_from_form(
+                picture=imagen,
+                mime_type=mime_type,
+                type="",
+                food_history_id=food_history.id,
+                totalCarbs=0.0,
+                dosis=0.0,
             )
-            
+
             return food_text_dic
 
         except Exception as e:

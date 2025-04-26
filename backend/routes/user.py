@@ -34,7 +34,7 @@ async def get_all_users(current_user: User = Depends(get_current_user), session:
 async def delete(current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     UserResource.delete_user(current_user, session)
 
-@router.delete("/delete_by_id/{user_id}", status_code=200)
+@router.delete("/delete_by_id/{user_id}", status_code=204)
 async def delete_user_by_id(user_id: int, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     return UserResource.delete_by_id(user_id, session)
 

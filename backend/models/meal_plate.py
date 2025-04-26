@@ -11,7 +11,8 @@ if TYPE_CHECKING:
 class MealPlate(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     picture: bytes = Field(sa_column=Column(LargeBinary, nullable=False)) 
-    type: str = Field(...)
+    picture_mime_type: str = Field(nullable=False)  # Campo para saber si es image/jpeg, image/png, etc.
+    type: str = Field(...) 
     totalCarbs: Optional[float] = Field(default=None)
     dosis: Optional[float] = Field(default=None)
 
