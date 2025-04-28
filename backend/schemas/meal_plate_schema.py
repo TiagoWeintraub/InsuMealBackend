@@ -3,6 +3,20 @@ from pydantic import BaseModel
 from fastapi import Form, UploadFile, File
 from typing import Optional
 
+class MealPlateCreate:
+    def __init__(
+        self,
+        type: str = Form(...),
+        food_history_id: int = Form(...),
+        totalCarbs: Optional[float] = Form(None),
+        dosis: Optional[float] = Form(None),
+        picture: UploadFile = File(...)
+    ):
+        self.type = type
+        self.food_history_id = food_history_id
+        self.totalCarbs = totalCarbs
+        self.dosis = dosis
+        self.picture = picture
 
 class MealPlateRead(BaseModel):
     id: int
@@ -24,17 +38,3 @@ class MealPlateUpdate(BaseModel):
         from_attributes = True
 
 
-class MealPlateCreate:
-    def __init__(
-        self,
-        type: str = Form(...),
-        food_history_id: int = Form(...),
-        totalCarbs: Optional[float] = Form(None),
-        dosis: Optional[float] = Form(None),
-        picture: UploadFile = File(...)
-    ):
-        self.type = type
-        self.food_history_id = food_history_id
-        self.totalCarbs = totalCarbs
-        self.dosis = dosis
-        self.picture = picture

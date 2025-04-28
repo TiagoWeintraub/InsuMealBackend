@@ -2,10 +2,14 @@ from pydantic import BaseModel
 
 class IngredientBase(BaseModel):
     name: str
-    quantity: float
+    carbsPerHundredGrams: float
+    meal_plate_id: int
 
 class IngredientCreate(IngredientBase):
-    pass
+    name: str
+    carbsPerHundredGrams: float
+    meal_plate_id: int
 
 class IngredientUpdate(IngredientBase):
-    pass
+    name: str
+    carbsPerHundredGrams: float

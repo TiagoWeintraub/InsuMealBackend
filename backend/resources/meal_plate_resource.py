@@ -8,7 +8,7 @@ class MealPlateResource:
     def __init__(self, session: Session):
         self.session = session
 
-    def create_from_form(self, *, picture: bytes, mime_type: str, type: str, food_history_id: int, totalCarbs: float = None, dosis: float = None) -> MealPlate:
+    def create(self, *, picture: bytes, mime_type: str, type: str, food_history_id: int, totalCarbs: float = None, dosis: float = None) -> MealPlate:
         meal_plate = MealPlate(
             picture=picture,
             picture_mime_type=mime_type,
@@ -60,3 +60,10 @@ class MealPlateResource:
             raise HTTPException(status_code=404, detail="MealPlate no encontrado")
         self.session.delete(meal_plate)
         self.session.commit()
+
+    def delete_all(self):
+        meal_plates = self.session.exec(select(MealPlate)).all()
+        for plate in meal_plates:
+            self.session.delete(plate)
+        self.session.commit()
+        return {"msg": "Todos los Meal Plates eliminados exitosamente"}

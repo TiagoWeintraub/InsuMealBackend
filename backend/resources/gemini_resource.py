@@ -1,5 +1,5 @@
-import os
 import io
+import os
 from PIL import Image, ImageOps
 from PIL.Image import Resampling
 import google.generativeai as genai
@@ -26,7 +26,16 @@ class GeminiResource:
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel("gemini-2.0-flash-lite")
 
-
+    def create_meal_plate(self, imagen: bytes, mime_type: str, food_history_id: int) -> None:
+        meal_plate_resource = MealPlateResource(self.session)
+        meal_plate_resource.create(
+            picture=imagen,
+            mime_type=mime_type,
+            type="",
+            food_history_id=food_history_id,
+            totalCarbs=0.0,
+            dosis=0.0,
+        )
 
     def analyze_image(self, image_data: bytes, current_user: User) -> Union[str, dict]:
         try:
@@ -41,6 +50,7 @@ class GeminiResource:
 
             # Enviar imagen y prompt
             response = self.model.generate_content([image, prompt])
+            print("Respuesta de Gemini recibida")
             
             food_text_dic = self.clean_data(response.text)
 
@@ -52,19 +62,13 @@ class GeminiResource:
             if not food_history:
                 raise HTTPException(status_code=404, detail="No se encontró historial de comidas para este usuario.")
 
+
             # Detectar automáticamente el mime_type
             detected_type = imghdr.what(None, imagen)
             mime_type = f"image/{detected_type}" if detected_type else "application/octet-stream"
 
-            meal_plate_resource = MealPlateResource(self.session)
-            meal_plate_resource.create_from_form(
-                picture=imagen,
-                mime_type=mime_type,
-                type="",
-                food_history_id=food_history.id,
-                totalCarbs=0.0,
-                dosis=0.0,
-            )
+
+            self.create_meal_plate(imagen, mime_type, food_history.id)
 
             return food_text_dic
 
@@ -86,6 +90,7 @@ class GeminiResource:
                 except ValueError:
                     pass
                 food_dict[key] = value
+            print("Diccionario de alimentos extraído")
             return food_dict
         else:
             print("No se encontró el diccionario en el texto.")
@@ -94,8 +99,6 @@ class GeminiResource:
         target_max_bytes = target_max_kb * 1024
         image = Image.open(io.BytesIO(image_data))
         image = ImageOps.exif_transpose(image)
-        print(f"Peso original en MB: {len(image_data) / (1024 * 1024):.2f} MB")
-        print(f"Dimensiones originales: {image.size}")
         if image.mode != "RGB":
             image = image.convert("RGB")
         max_dimension = 1024  
@@ -115,4 +118,5 @@ class GeminiResource:
         else:
             print(f"Peso final: {final_size_kb:.2f} KB con calidad {quality}")
             print(f"Dimensiones finales: {image.size}")
+        print("Imagen comprimida")
         return compressed_data

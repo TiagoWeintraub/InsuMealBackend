@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 class Ingredient(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
-    carbsPerHundredgrams: float
+    carbsPerHundredGrams: float
 
     # Relación bidireccional Muchos-a-Muchos con MealPlate
     meal_plates: List["MealPlate"] = Relationship(
