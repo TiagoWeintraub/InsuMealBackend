@@ -18,7 +18,7 @@ def init_db():
     try:
         print("Intentando crear tablas...")
         SQLModel.metadata.create_all(engine)
-        print("\nTablas creadas.")
+        print("\Base de Datos lista.")
     except Exception as e:
         print(f"\nPuede que las tablas ya existieran: {e}")
 

@@ -13,3 +13,4 @@ async def analyze_image(file: UploadFile = File(...), current_user: User = Depen
     vision_resource = GeminiResource(session)
     result = vision_resource.analyze_image(image_bytes, current_user)
     return {"result": result}
+

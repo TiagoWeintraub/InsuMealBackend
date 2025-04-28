@@ -13,6 +13,8 @@ from fastapi import HTTPException
 from models.food_history import FoodHistory
 import imghdr
 from sqlmodel import select
+from resources.edamam_resource import EdamamResource
+
 
 
 load_dotenv()
@@ -26,16 +28,17 @@ class GeminiResource:
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel("gemini-2.0-flash-lite")
 
-    def create_meal_plate(self, imagen: bytes, mime_type: str, food_history_id: int) -> None:
+    def create_meal_plate(self, imagen: bytes, mime_type: str, food_history_id: int, food_text_dic) -> None:
         meal_plate_resource = MealPlateResource(self.session)
         meal_plate_resource.create(
             picture=imagen,
             mime_type=mime_type,
-            type="",
+            type= str(list(food_text_dic.keys())[0]).lower(),
             food_history_id=food_history_id,
             totalCarbs=0.0,
             dosis=0.0,
         )
+
 
     def analyze_image(self, image_data: bytes, current_user: User) -> Union[str, dict]:
         try:
@@ -43,6 +46,10 @@ class GeminiResource:
             imagen = self.reduce_image_weight(image_data)
             # Convertimos la imagen a un objeto de tipo Image
             image = Image.open(io.BytesIO(imagen))
+
+            # Detectar automáticamente el mime_type
+            detected_type = imghdr.what(None, imagen)
+            mime_type = f"image/{detected_type}" if detected_type else "application/octet-stream"
 
             # Prompt detallado in-context learning
             with open("in-context-learning/prompt.txt", "r") as f:
@@ -53,6 +60,7 @@ class GeminiResource:
             print("Respuesta de Gemini recibida")
             
             food_text_dic = self.clean_data(response.text)
+            print("El diccionario de alimentos ha sido limpiado y es: ", food_text_dic)
 
             # Se busca el FoodHistory del usuario
             food_history = self.session.exec(
@@ -62,13 +70,13 @@ class GeminiResource:
             if not food_history:
                 raise HTTPException(status_code=404, detail="No se encontró historial de comidas para este usuario.")
 
+            self.create_meal_plate(imagen, mime_type, food_history.id, food_text_dic)
 
-            # Detectar automáticamente el mime_type
-            detected_type = imghdr.what(None, imagen)
-            mime_type = f"image/{detected_type}" if detected_type else "application/octet-stream"
+            # Al recurso call edamam se le envia el diccionario de alimentos sin el primer elemento clave-valor
+            edamam_dic = {k: v for k, v in food_text_dic.items() if k != list(food_text_dic.keys())[0]}
+            print("El diccionario de alimentos que se le envía a Edamam es: ", edamam_dic)
 
-
-            self.create_meal_plate(imagen, mime_type, food_history.id)
+            self.call_edamam_resource(edamam_dic, current_user)
 
             return food_text_dic
 
@@ -120,3 +128,9 @@ class GeminiResource:
             print(f"Dimensiones finales: {image.size}")
         print("Imagen comprimida")
         return compressed_data
+
+    def call_edamam_resource(self, food_dic, current_user: User) -> None:
+
+        edamam_resource = EdamamResource(self.session, current_user)
+        edamam_resource.orquest(food_dic)
+        print("Se ha llamado a EdamamResource")
