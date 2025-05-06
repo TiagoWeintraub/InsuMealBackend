@@ -109,3 +109,4 @@ class NutritionixResource:
         
         ingredient_resource.create(ingredient_data)
         return {"message": "Ingrediente creado exitosamente"}
+
