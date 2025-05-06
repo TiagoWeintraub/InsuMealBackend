@@ -14,7 +14,7 @@ from models.food_history import FoodHistory
 import imghdr
 from sqlmodel import select
 from resources.edamam_resource import EdamamResource
-
+from resources.nutritionix_resource import NutritionixResource
 
 
 load_dotenv()
@@ -56,6 +56,7 @@ class GeminiResource:
                 prompt = f.read()
 
             # Enviar imagen y prompt
+            print("Enviando imagen y prompt a Gemini")
             response = self.model.generate_content([image, prompt])
             print("Respuesta de Gemini recibida")
             
@@ -76,12 +77,16 @@ class GeminiResource:
             edamam_dic = {k: v for k, v in food_text_dic.items() if k != list(food_text_dic.keys())[0]}
             print("El diccionario de alimentos que se le envía a Edamam es: ", edamam_dic)
 
-            self.call_edamam_resource(edamam_dic, current_user)
+            self.call_nutritional_api_resource(edamam_dic, current_user)
 
             return food_text_dic
 
+        except HTTPException as http_exc:
+            print(f"Error HTTP: {http_exc.detail}")
+            raise http_exc
         except Exception as e:
-            return {"error": str(e)}
+            print(f"Error inesperado: {str(e)}")
+            raise HTTPException(status_code=500, detail="Error interno del servidor")
 
     def clean_data(self, data: str) -> dict:
         match = re.search(r"food\s*=\s*({.*?})", data, re.DOTALL)
@@ -129,8 +134,11 @@ class GeminiResource:
         print("Imagen comprimida")
         return compressed_data
 
-    def call_edamam_resource(self, food_dic, current_user: User) -> None:
+    def call_nutritional_api_resource(self, food_dic, current_user: User) -> None:
 
-        edamam_resource = EdamamResource(self.session, current_user)
-        edamam_resource.orquest(food_dic)
+        # edamam_resource = EdamamResource(self.session, current_user)
+        # edamam_resource.orquest(food_dic)
+        
+        nutritionix_resource = NutritionixResource(self.session, current_user)
+        nutritionix_resource.orquest(food_dic)
         print("Se ha llamado a EdamamResource")

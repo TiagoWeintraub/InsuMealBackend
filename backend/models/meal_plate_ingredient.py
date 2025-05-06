@@ -1,7 +1,6 @@
 from typing import Optional
 from sqlmodel import SQLModel, Field
-# Importaciones SQLAlchemy para definición explícita de columnas
-from sqlalchemy import Column, ForeignKey, Integer
+from sqlalchemy import Column, ForeignKey, Integer, Float  
 
 class MealPlateIngredient(SQLModel, table=True):
     # Clave primaria/foránea a MealPlate con cascade
@@ -9,8 +8,8 @@ class MealPlateIngredient(SQLModel, table=True):
         default=None,
         sa_column=Column(
             Integer,
-            ForeignKey("mealplate.id", ondelete="CASCADE"), # FK con cascade
-            primary_key=True, # PK en la BD
+            ForeignKey("mealplate.id", ondelete="CASCADE"),  # FK con cascade
+            primary_key=True,  # PK en la BD
             nullable=False
         )
     )
@@ -19,10 +18,24 @@ class MealPlateIngredient(SQLModel, table=True):
         default=None,
         sa_column=Column(
             Integer,
-            ForeignKey("ingredient.id", ondelete="CASCADE"), # FK con cascade
-            primary_key=True, # PK en la BD
+            ForeignKey("ingredient.id", ondelete="CASCADE"),  # FK con cascade
+            primary_key=True,  # PK en la BD
             nullable=False
         )
     )
 
-    # No necesita __repr__ usualmente
+    grams: Optional[float] = Field(
+        default=0.0,
+        sa_column=Column(
+            Float,
+            nullable=True 
+        )
+    )
+
+    carbs: Optional[float] = Field(
+        default=0.0,
+        sa_column=Column(
+            Float,
+            nullable=True  
+        )
+    )

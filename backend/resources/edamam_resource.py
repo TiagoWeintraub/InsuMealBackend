@@ -11,6 +11,7 @@ from schemas.ingredient_schema import IngredientCreate
 from models.ingredient import Ingredient
 from models.meal_plate import MealPlate
 from models.food_history import FoodHistory
+import time
 
 
 load_dotenv()
@@ -88,6 +89,9 @@ class EdamamResource:
             # Se crea el ingrediente usando el nombre normalizado
             self.create_ingredient(normalized_label, carbs_data["totalNutrients"]["CHOCDF"]["quantity"])
             print("Alimento:", normalized_label, "Carbohidratos:", carbs_data["totalNutrients"]["CHOCDF"]["quantity"])
+
+            time.sleep(25)  # Espera 25 segundos entre cada llamada a la API para evitar el límite de tasa
+
 
 
 

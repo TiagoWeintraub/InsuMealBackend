@@ -11,5 +11,4 @@ class IngredientCreate(IngredientBase):
     meal_plate_id: int
 
 class IngredientUpdate(IngredientBase):
-    name: str
     carbsPerHundredGrams: float

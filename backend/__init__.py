@@ -9,6 +9,7 @@ from routes.food_history import router as food_history_router
 from routes.ingredient import router as ingredient_router
 from routes.meal_plate import router as meal_plate_router
 from routes.auth import router as auth_router
+from routes.meal_plate_ingredient import router as meal_plate_ingredient_router
 
 load_dotenv()  
 
@@ -28,3 +29,4 @@ app.include_router(clinical_data_router)
 app.include_router(food_history_router)
 app.include_router(ingredient_router)
 app.include_router(meal_plate_router)
+app.include_router(meal_plate_ingredient_router)
