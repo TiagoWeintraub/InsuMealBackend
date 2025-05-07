@@ -54,6 +54,11 @@ async def update_ingredient(ingredient_id: int, data: IngredientUpdate, current_
     resource = IngredientResource(session)
     return resource.update(ingredient_id, data)
 
+@router.delete("/all")
+async def delete_all_ingredients(current_user=Depends(get_current_user), session: Session = Depends(get_session)):
+    resource = IngredientResource(session)
+    return resource.delete_all_ingredients()
+
 @router.delete("/{ingredient_id}")
 async def delete_ingredient(ingredient_id: int, current_user=Depends(get_current_user), session: Session = Depends(get_session)):
     resource = IngredientResource(session)

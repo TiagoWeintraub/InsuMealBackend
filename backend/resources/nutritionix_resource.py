@@ -10,6 +10,9 @@ from models.user import User
 from schemas.ingredient_schema import IngredientCreate
 from models.meal_plate import MealPlate
 from models.food_history import FoodHistory
+from resources.meal_plate_ingredient_resource import MealPlateIngredientResource
+from models.ingredient import Ingredient
+from schemas.meal_plate_ingredient_schema import MealPlateIngredientUpdate
 import time
 
 
@@ -81,6 +84,14 @@ class NutritionixResource:
             # Se crea el ingrediente usando el nombre normalizado
             self.create_ingredient(normalized_api_food_name, food_data["carbs"])
             
+            # Obtiene el ID del ingrediente creado
+            ingredientId = self.session.exec(
+                select(Ingredient).where(Ingredient.name == normalized_api_food_name)
+            ).first()
+            
+            # se actualiza la tabla MealPlateIngredient para que tenga los gramos y carbohidratos
+            self.update_meal_plate_ingredient(normalized_api_food_name, food_data["carbs"], grams, ingredientId.id)
+            
             print("\n\nAlimento:", normalized_api_food_name, "Carbohidratos:", food_data["carbs"],"\n\n")
 
 
@@ -110,3 +121,22 @@ class NutritionixResource:
         ingredient_resource.create(ingredient_data)
         return {"message": "Ingrediente creado exitosamente"}
 
+    def update_meal_plate_ingredient(self, food_name: str, carbs: float, grams: float, ingredient_id: int):
+        print("Actualizando MealPlateIngredient")
+        
+        resource = MealPlateIngredientResource(self.session)
+        
+        # Obtenemos el MealPlate asociado al Ingredient
+        meal_plate = self.session.exec(
+            select(MealPlate).where(MealPlate.ingredients.any(Ingredient.id == ingredient_id))
+        ).first()
+        if not meal_plate:
+            raise HTTPException(status_code=404, detail="No se encontró el MealPlate asociado al ingrediente.")
+        
+        # Actualizamos el MealPlateIngredient con el Schema 
+        data = MealPlateIngredientUpdate(
+            grams=grams,
+            carbs=carbs
+        )
+        updated_ingredient = resource.update(meal_plate.id, ingredient_id, data)
+        return {"message": "MealPlateIngredient actualizado exitosamente", "data": updated_ingredient}

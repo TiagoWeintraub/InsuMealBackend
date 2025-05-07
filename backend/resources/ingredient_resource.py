@@ -74,3 +74,10 @@ class IngredientResource:
             raise HTTPException(status_code=404, detail="Ingredient no encontrado")
         self.session.delete(ingredient)
         self.session.commit()
+    
+    def delete_all_ingredients(self):
+        ingredients = self.session.exec(select(Ingredient)).all()
+        for ingredient in ingredients:
+            self.session.delete(ingredient)
+        self.session.commit()
+        return {"msg": "Todos los ingredientes eliminados exitosamente"}
