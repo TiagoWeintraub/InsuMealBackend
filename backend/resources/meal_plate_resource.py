@@ -20,7 +20,7 @@ class MealPlateResource:
         self.session.add(meal_plate)
         self.session.commit()
         self.session.refresh(meal_plate)
-        return meal_plate
+        return meal_plate.id
 
     def get_all(self):
         meal_plates = self.session.exec(select(MealPlate)).all()

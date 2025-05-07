@@ -33,7 +33,7 @@ class NutritionixResource:
         print("Post para buscar carbohidratos por nombre")
         url = f"{self.base_url}"    
         
-        formated_query = f"{grams} grams of {food_name}" 
+        formated_query = f"100 grams of {food_name}" 
 
         headers = {
             "x-app-id": self.app_id,
@@ -63,7 +63,7 @@ class NutritionixResource:
             }
 
 
-    def orquest(self, food_dic):  
+    def orquest(self, food_dic, meal_plate_id: int):  
         print("Iniciando la orquestación de nutritionix")
         name_and_carbs_dic = {}
         
@@ -82,7 +82,7 @@ class NutritionixResource:
             }
 
             # Se crea el ingrediente usando el nombre normalizado
-            self.create_ingredient(normalized_api_food_name, food_data["carbs"])
+            self.create_ingredient(meal_plate_id,normalized_api_food_name, food_data["carbs"])
             
             # Obtiene el ID del ingrediente creado
             ingredientId = self.session.exec(
@@ -90,12 +90,12 @@ class NutritionixResource:
             ).first()
             
             # se actualiza la tabla MealPlateIngredient para que tenga los gramos y carbohidratos
-            self.update_meal_plate_ingredient(normalized_api_food_name, food_data["carbs"], grams, ingredientId.id)
+            self.update_meal_plate_ingredient(meal_plate_id, normalized_api_food_name, food_data["carbs"], grams, ingredientId.id)
             
             print("\n\nAlimento:", normalized_api_food_name, "Carbohidratos:", food_data["carbs"],"\n\n")
 
 
-    def create_ingredient(self, name: str, carbs: float):
+    def create_ingredient(self, meal_plate_id, name: str, carbs: float):
         ingredient_resource = IngredientResource(self.session)
         
         # Obtener el FoodHistory asociado al usuario actual
@@ -106,37 +106,27 @@ class NutritionixResource:
             raise HTTPException(status_code=404, detail="FoodHistory no encontrado para el usuario.")
         
         # Buscar el MealPlate asociado al FoodHistory obtenido
-        meal_plate = self.session.exec(
-            select(MealPlate).where(MealPlate.food_history_id == food_history.id)
-        ).first()
-        if not meal_plate:
-            raise HTTPException(status_code=404, detail="No se encontró el último MealPlate creado.")
+        
         
         ingredient_data = IngredientCreate(
             name=name, 
             carbsPerHundredGrams=carbs,
-            meal_plate_id=meal_plate.id
+            meal_plate_id=meal_plate_id
         )
         
         ingredient_resource.create(ingredient_data)
         return {"message": "Ingrediente creado exitosamente"}
 
-    def update_meal_plate_ingredient(self, food_name: str, carbs: float, grams: float, ingredient_id: int):
+    def update_meal_plate_ingredient(self,meal_plate_id, food_name: str, carbsPerHundredGrams: float, grams: float, ingredient_id: int):
         print("Actualizando MealPlateIngredient")
         
         resource = MealPlateIngredientResource(self.session)
         
-        # Obtenemos el MealPlate asociado al Ingredient
-        meal_plate = self.session.exec(
-            select(MealPlate).where(MealPlate.ingredients.any(Ingredient.id == ingredient_id))
-        ).first()
-        if not meal_plate:
-            raise HTTPException(status_code=404, detail="No se encontró el MealPlate asociado al ingrediente.")
-        
-        # Actualizamos el MealPlateIngredient con el Schema 
+        carbs = round((carbsPerHundredGrams * grams) / 100, 2)
+                
         data = MealPlateIngredientUpdate(
-            grams=grams,
+            grams=round(grams, 2),
             carbs=carbs
         )
-        updated_ingredient = resource.update(meal_plate.id, ingredient_id, data)
-        return {"message": "MealPlateIngredient actualizado exitosamente", "data": updated_ingredient}
+        updated_ingredient = resource.update(meal_plate_id, ingredient_id, data)
+        return {"\nmessage": "MealPlateIngredient actualizado exitosamente. Hay {carbs} gramos de carbohidratos en {grams} gramos de {food_name}", "data": updated_ingredient}

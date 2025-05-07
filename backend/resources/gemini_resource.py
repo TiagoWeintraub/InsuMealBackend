@@ -15,6 +15,7 @@ import imghdr
 from sqlmodel import select
 from resources.edamam_resource import EdamamResource
 from resources.nutritionix_resource import NutritionixResource
+from models.meal_plate import MealPlate
 
 
 load_dotenv()
@@ -30,7 +31,7 @@ class GeminiResource:
 
     def create_meal_plate(self, imagen: bytes, mime_type: str, food_history_id: int, food_text_dic) -> None:
         meal_plate_resource = MealPlateResource(self.session)
-        meal_plate_resource.create(
+        response = meal_plate_resource.create(
             picture=imagen,
             mime_type=mime_type,
             type= str(list(food_text_dic.keys())[0]).lower(),
@@ -38,7 +39,7 @@ class GeminiResource:
             totalCarbs=0.0,
             dosis=0.0,
         )
-
+        return response
 
     def analyze_image(self, image_data: bytes, current_user: User) -> Union[str, dict]:
         try:
@@ -71,13 +72,17 @@ class GeminiResource:
             if not food_history:
                 raise HTTPException(status_code=404, detail="No se encontró historial de comidas para este usuario.")
 
-            self.create_meal_plate(imagen, mime_type, food_history.id, food_text_dic)
+            # Se busca el último MealPlate del usuario
+            meal_plate_id = self.create_meal_plate(imagen, mime_type, food_history.id, food_text_dic)
+
 
             # Al recurso call edamam se le envia el diccionario de alimentos sin el primer elemento clave-valor
             edamam_dic = {k: v for k, v in food_text_dic.items() if k != list(food_text_dic.keys())[0]}
             print("El diccionario de alimentos que se le envía a Edamam es: ", edamam_dic)
 
-            self.call_nutritional_api_resource(edamam_dic, current_user)
+
+            
+            self.call_nutritional_api_resource(edamam_dic, meal_plate_id ,current_user)
 
             return food_text_dic
 
@@ -134,11 +139,11 @@ class GeminiResource:
         print("Imagen comprimida")
         return compressed_data
 
-    def call_nutritional_api_resource(self, food_dic, current_user: User) -> None:
+    def call_nutritional_api_resource(self, food_dic, meal_plate_id,current_user: User) -> None:
 
         # edamam_resource = EdamamResource(self.session, current_user)
         # edamam_resource.orquest(food_dic)
         
         nutritionix_resource = NutritionixResource(self.session, current_user)
-        nutritionix_resource.orquest(food_dic)
+        nutritionix_resource.orquest(food_dic,meal_plate_id)
         print("Se ha llamado a EdamamResource")

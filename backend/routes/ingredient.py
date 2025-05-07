@@ -26,7 +26,7 @@ async def read_ingredient_by_name(ingredient_name: str, current_user=Depends(get
             return i
     return {"msg": "No se encontró el ingrediente"} 
 
-@router.get("/in/meal_plate/{meal_plate_id}") # Ingredientes por MealPlate
+@router.get("/meal_plate/{meal_plate_id}") # Ingredientes por MealPlate
 async def get_meal_plate_with_ingredients(
     meal_plate_id: int,
     current_user=Depends(get_current_user),
