@@ -39,8 +39,17 @@ Example 2: Milanese with Mashed Potatoes
 food = {Meat Milanese:1, "Meat": 120, "breadcrumbs": 25, "mashed potatoes": 180}
 
 Example 3: Pizza
-- If there is a pizza with pizza dough weighing ~200g on average, cheese weighing ~150g on average, tomato sauce weighing ~100g on average, 10 slices of pepperoni weighing ~5g each on average, then you have to return the following dictionary:
-food = {"pizza":1, "pizza dough": 200, "cheese": 150, "tomato sauce": 100, "pepperoni": 50}
+- If there is a big pizza (8-slides) the pizza dough weighing ~500g on average, cheese weighing ~250g on average, tomato sauce weighing ~200g on average, 30 slices of pepperoni weighing ~5g each on average, then you have to return the following dictionary:
+food = {"pizza":1, "pizza dough": 500, "cheese": 250, "tomato sauce": 200, "pepperoni": 150}
+
+But if the pizza is medium (4 sildes pizza) the pizza dough weighing ~250g on average, cheese weighing ~125g on average, tomato sauce weighing ~100g on average, 15 slices of pepperoni weighing ~5g each on average, then you have to return the following dictionary:
+food = {"pizza":1, "pizza dough": 300, "cheese": 150, "tomato sauce": 100, "pepperoni": 75}
+
+And if it's an individual cricular pizza the pizza dough weighing ~125 on average, cheese weighing ~62.5 on average, tomato sauce weighing ~50g on average, 10 slices of pepperoni weighing ~5g each on average, then you have to return the following dictionary:
+food = {"pizza":1, "pizza dough": 125, "cheese": 62.5, "tomato sauce": 50, "pepperoni": 50}
+
+Else if it's an individual slice of pizza the pizza dough weighing ~63 on average, cheese weighing ~31 on average, tomato sauce weighing ~23g on average, 2 slices of pepperoni weighing ~5g each on average, then you have to return the following dictionary:
+food = {"pizza": 1, "pizza dough": 63, "cheese": 31, "tomato sauce": 23, "pepperoni": 10}
 
 Example 4: Pasta
 - If there is a pasta dish with spaghetti weighing ~250g on average, Bolognese sauce weighing ~200g on average, and grated cheese weighing ~30g on average, then you have to return the following dictionary:
