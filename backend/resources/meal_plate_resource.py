@@ -20,7 +20,14 @@ class MealPlateResource:
         self.session.add(meal_plate)
         self.session.commit()
         self.session.refresh(meal_plate)
-        return meal_plate.id
+        return meal_plate
+
+
+    def get_by_id(self, id: int):
+        plate = self.session.exec(select(MealPlate).where(MealPlate.id == id)).first()
+        if not plate:
+            raise HTTPException(status_code=404, detail="MealPlate no encontrado")
+        return plate 
 
     def get_all(self):
         meal_plates = self.session.exec(select(MealPlate)).all()

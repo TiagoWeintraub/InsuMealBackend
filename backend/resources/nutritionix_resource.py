@@ -13,6 +13,7 @@ from models.food_history import FoodHistory
 from resources.meal_plate_ingredient_resource import MealPlateIngredientResource
 from models.ingredient import Ingredient
 from schemas.meal_plate_ingredient_schema import MealPlateIngredientUpdate
+from resources.dosis_resource import DosisResource
 import time
 
 
@@ -63,10 +64,11 @@ class NutritionixResource:
             }
 
 
-    def orquest(self, food_dic, meal_plate_id: int):  
+    def orquest(self, food_dic, meal_plate: MealPlate = None):  
         print("Iniciando la orquestación de nutritionix")
         name_and_carbs_dic = {}
-        
+        totalCarbs = 0.0
+
         for key in food_dic.keys():
 
             normalized_food = key.lower()
@@ -82,7 +84,7 @@ class NutritionixResource:
             }
 
             # Se crea el ingrediente usando el nombre normalizado
-            self.create_ingredient(meal_plate_id,normalized_api_food_name, food_data["carbs"])
+            self.create_ingredient(meal_plate.id,normalized_api_food_name, food_data["carbs"])
             
             # Obtiene el ID del ingrediente creado
             ingredientId = self.session.exec(
@@ -90,23 +92,24 @@ class NutritionixResource:
             ).first()
             
             # se actualiza la tabla MealPlateIngredient para que tenga los gramos y carbohidratos
-            self.update_meal_plate_ingredient(meal_plate_id, normalized_api_food_name, food_data["carbs"], grams, ingredientId.id)
+            self.update_meal_plate_ingredient(food_data["carbs"], grams, ingredientId.id, meal_plate.id)
             
             print("\n\nAlimento:", normalized_api_food_name, "Carbohidratos:", food_data["carbs"],"\n\n")
+            
+            totalCarbs += food_data["carbs"] # Se va sumando el total de carbohidratos
+        
+        # Se actualiza el total de carbohidratos en la tabla MealPlate
+        self.update_meal_plate_total_carbs(meal_plate.id, totalCarbs)
+        print("Total de carbohidratos:", totalCarbs)
+        
+        self.calculate_dosis(meal_plate.id)
+        
+        return meal_plate
+
 
 
     def create_ingredient(self, meal_plate_id, name: str, carbs: float):
         ingredient_resource = IngredientResource(self.session)
-        
-        # Obtener el FoodHistory asociado al usuario actual
-        food_history = self.session.exec(
-            select(FoodHistory).where(FoodHistory.user_id == self.current_user.id)
-        ).first()
-        if not food_history:
-            raise HTTPException(status_code=404, detail="FoodHistory no encontrado para el usuario.")
-        
-        # Buscar el MealPlate asociado al FoodHistory obtenido
-        
         
         ingredient_data = IngredientCreate(
             name=name, 
@@ -115,12 +118,13 @@ class NutritionixResource:
         )
         
         ingredient_resource.create(ingredient_data)
+        print("Ingrediente ", name, "Creado exitosamente")
         return {"message": "Ingrediente creado exitosamente"}
 
-    def update_meal_plate_ingredient(self,meal_plate_id, food_name: str, carbsPerHundredGrams: float, grams: float, ingredient_id: int):
-        print("Actualizando MealPlateIngredient")
+    def update_meal_plate_ingredient(self, carbsPerHundredGrams: float, grams: float, ingredient_id: int, meal_plate_id: int):
+        print("Actualizando MealPlateIngredient en Nutritionix")
         
-        resource = MealPlateIngredientResource(self.session)
+        resource = MealPlateIngredientResource(self.session, current_user=self.current_user)
         
         carbs = round((carbsPerHundredGrams * grams) / 100, 2)
                 
@@ -128,5 +132,24 @@ class NutritionixResource:
             grams=round(grams, 2),
             carbs=carbs
         )
+        
+
         updated_ingredient = resource.update(meal_plate_id, ingredient_id, data)
-        return {"\nmessage": "MealPlateIngredient actualizado exitosamente. Hay {carbs} gramos de carbohidratos en {grams} gramos de {food_name}", "data": updated_ingredient}
+
+        return carbs 
+    
+    def update_meal_plate_total_carbs(self, meal_plate_id: int, totalCarbs: float):
+        print("Actualizando el total de carbs del MealPlate")
+        meal_plate = self.session.get(MealPlate, meal_plate_id)
+        if not meal_plate:
+            raise HTTPException(status_code=404, detail="MealPlate no encontrado")
+        meal_plate.totalCarbs = totalCarbs
+        self.session.add(meal_plate)
+        self.session.commit()
+        self.session.refresh(meal_plate)
+        return meal_plate
+    
+    def calculate_dosis(self, meal_plate_id: int): # ESTE METODO NO VA, ES DE PRUEBA
+        dosis_resource = DosisResource(self.session)
+        dosis = dosis_resource.calculate(meal_plate_id, self.current_user)
+        return {"Dosis calculada correctamente {dosis}"}

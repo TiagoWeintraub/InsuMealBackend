@@ -4,6 +4,7 @@ from fastapi import HTTPException
 from models.ingredient import Ingredient
 from schemas.ingredient_schema import IngredientCreate, IngredientUpdate
 from models.meal_plate import MealPlate
+from models.meal_plate_ingredient import MealPlateIngredient
 
 
 class IngredientResource:
@@ -45,17 +46,36 @@ class IngredientResource:
         return self.session.exec(select(Ingredient)).all()
 
 
-    def read_ingredients_by_meal_plate(self, meal_plate_id: int) -> MealPlate:
-        query = (
-            select(MealPlate)
-            .where(MealPlate.id == meal_plate_id)
-            .options(selectinload(MealPlate.ingredients))
-        )
-        meal_plate = self.session.exec(query).first()
+    def read_ingredients_by_meal_plate(self, meal_plate_id: int) -> MealPlate: # Trae todos los ingredientes de un MealPlate, y aparte por cada ingrediente trae la cantidad de gramos y carbohidratos de la tabla MealPlateIngredient
+        meal_plate = self.session.query(MealPlate).options(
+            selectinload(MealPlate.ingredients)
+        ).filter(MealPlate.id == meal_plate_id).first()
+
         if not meal_plate:
             raise HTTPException(status_code=404, detail="MealPlate no encontrado")
-        # meal_plate.ingredients contiene la información completa de cada ingrediente
-        return meal_plate
+
+        ingredients_with_details = []
+        for ingredient in meal_plate.ingredients:
+            meal_plate_ingredient = self.session.exec(
+                select(MealPlateIngredient).where(
+                    (MealPlateIngredient.meal_plate_id == meal_plate_id) &
+                    (MealPlateIngredient.ingredient_id == ingredient.id)
+                )
+            ).first()
+
+            if meal_plate_ingredient:
+                ingredients_with_details.append({
+                    "id": ingredient.id,
+                    "name": ingredient.name,
+                    "carbsPerHundredGrams": ingredient.carbsPerHundredGrams,
+                    "grams": meal_plate_ingredient.grams,
+                    "carbs": meal_plate_ingredient.carbs
+                })
+
+        return {
+            "meal_plate_id": meal_plate.id,
+            "ingredients": ingredients_with_details
+        }
 
     def update(self, ingredient_id: int, data: IngredientUpdate) -> Ingredient:
         ingredient = self.session.get(Ingredient, ingredient_id)

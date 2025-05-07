@@ -62,7 +62,7 @@ class GeminiResource:
             print("Respuesta de Gemini recibida")
             
             food_text_dic = self.clean_data(response.text)
-            print("El diccionario de alimentos ha sido limpiado y es: ", food_text_dic)
+            print("La respuesta de Gemini ha sido limpiada")
 
             # Se busca el FoodHistory del usuario
             food_history = self.session.exec(
@@ -73,16 +73,16 @@ class GeminiResource:
                 raise HTTPException(status_code=404, detail="No se encontró historial de comidas para este usuario.")
 
             # Se busca el último MealPlate del usuario
-            meal_plate_id = self.create_meal_plate(imagen, mime_type, food_history.id, food_text_dic)
+            meal_plate = self.create_meal_plate(imagen, mime_type, food_history.id, food_text_dic)
 
 
-            # Al recurso call edamam se le envia el diccionario de alimentos sin el primer elemento clave-valor
-            edamam_dic = {k: v for k, v in food_text_dic.items() if k != list(food_text_dic.keys())[0]}
-            print("El diccionario de alimentos que se le envía a Edamam es: ", edamam_dic)
+            # Al recurso call nutritional_api se le envia el diccionario de alimentos sin el primer elemento clave-valor
+            nutritional_api_dic = {k: v for k, v in food_text_dic.items() if k != list(food_text_dic.keys())[0]}
+            print("El diccionario de alimentos que se le envía a nutritional_api es: ", nutritional_api_dic)
 
 
             
-            self.call_nutritional_api_resource(edamam_dic, meal_plate_id ,current_user)
+            self.call_nutritional_api_resource(nutritional_api_dic, meal_plate ,current_user)
 
             return food_text_dic
 
@@ -139,11 +139,11 @@ class GeminiResource:
         print("Imagen comprimida")
         return compressed_data
 
-    def call_nutritional_api_resource(self, food_dic, meal_plate_id,current_user: User) -> None:
+    def call_nutritional_api_resource(self, food_dic, meal_plate: MealPlate ,current_user: User) -> None:
 
         # edamam_resource = EdamamResource(self.session, current_user)
         # edamam_resource.orquest(food_dic)
         
         nutritionix_resource = NutritionixResource(self.session, current_user)
-        nutritionix_resource.orquest(food_dic,meal_plate_id)
-        print("Se ha llamado a EdamamResource")
+        nutritionix_resource.orquest(food_dic,meal_plate)
+        print("Se ha llamado a la Api Nutricional")

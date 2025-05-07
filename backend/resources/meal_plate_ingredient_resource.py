@@ -3,10 +3,12 @@ from fastapi import HTTPException
 from models.meal_plate_ingredient import MealPlateIngredient
 from schemas.meal_plate_ingredient_schema import MealPlateIngredientUpdate
 from schemas.meal_plate_ingredient_schema import MealPlateIngredientRead
+from models.user import User
 
 class MealPlateIngredientResource:
-    def __init__(self, session: Session):
+    def __init__(self, session: Session, current_user: User = None):
         self.session = session
+        self.current_user = current_user
 
     def update(self, meal_plate_id: int, ingredient_id: int, data: MealPlateIngredientUpdate) -> MealPlateIngredient:
         meal_plate_ingredient = self.session.get(MealPlateIngredient, (meal_plate_id, ingredient_id))

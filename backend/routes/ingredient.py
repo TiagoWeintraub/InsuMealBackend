@@ -33,21 +33,7 @@ async def get_meal_plate_with_ingredients(
     session: Session = Depends(get_session)
 ):
     resource = IngredientResource(session)
-    meal_plate = resource.read_ingredients_by_meal_plate(meal_plate_id)
-    if not meal_plate:
-        return {"msg": "No se encontró el MealPlate"}
-    ingredients = [
-        {
-            "id": ingredient.id,
-            "name": ingredient.name,
-            "carbsPerHundredGrams": ingredient.carbsPerHundredGrams
-        }
-        for ingredient in meal_plate.ingredients
-    ]
-    return {
-        "meal_plate_id": meal_plate.id,
-        "ingredients": ingredients
-    }
+    return resource.read_ingredients_by_meal_plate(meal_plate_id)
 
 @router.put("/{ingredient_id}")
 async def update_ingredient(ingredient_id: int, data: IngredientUpdate, current_user=Depends(get_current_user), session: Session = Depends(get_session)):

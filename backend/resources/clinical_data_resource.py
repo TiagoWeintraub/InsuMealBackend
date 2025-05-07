@@ -2,10 +2,12 @@ from sqlmodel import Session, select
 from fastapi import HTTPException
 from models.clinical_data import ClinicalData
 from schemas.clinical_data_schema import ClinicalDataCreate, ClinicalDataUpdate
+from models.user import User
 
 class ClinicalDataResource:
-    def __init__(self, session: Session):
+    def __init__(self, session: Session, current_user: User = None):
         self.session = session
+        self.current_user = current_user
 
     def create(self, data: ClinicalDataCreate) -> ClinicalData:
         clinical_data = ClinicalData(**data.model_dump())

@@ -58,6 +58,10 @@ Example 7: Beef Milanese with baked potatoes
 If there is a beef Milanese with the meat weighing ~130g on average, breadcrumbs weighing ~30g on average, and mashed potatoes weighing ~200g on average, then you have to return the following dictionary:
 food = {"beef milanese":1, "beef": 130, "breadcrumbs": 30, "mashed potatoes": 200}
 
+Example 6: Only White Rice 
+If there is only a plate of White Rice weighing ~200g or any other single food, you must repeat the food, but the first element it only have the instances, so it will be 1 in this example, because there is only 1 plate:
+food = {"White Rice":1, "White Rice": 200, "White rice": 200}
+
 Remember that the weights I gave you are an example, you must place them according to the image but always take AVERAGE weights of each food individually.
 
 Common cases where you should break down food items:
