@@ -32,7 +32,9 @@ You should always take AVERAGE weights of each food individually
 Example 1: Hamburger
 - If there is a hamburger that has 2 tomato slices that weigh on average ~20g each, 1 hamburger bun (meaning the top and bottom layers form 1 bun) that weighs on average 100g, 1 hamburger patty that weighs ~100g the patty, 2 lettuce leaves that weigh ~10g each on average, and 2 cheddar cheese slices that weigh ~20g each on average, then you have to return the following dictionary:
 food = {“hamburger”:1, "hamburger bun": 100, "hamburger meat": 200, "tomato": 40, "lettuce": 20, "cheddar cheese": 40}
-Note: If 2 meats were detected, it would be 200 grams of hamburger meat. If you are confident enough to distinguish whether the cheese is cheddar, write it as cheddar, otherwise simply as cheese
+Note: If 2 meats were detected, it would be 200 grams of hamburger meat. If you are confident enough to distinguish whether the cheese is cheddar, write it as cheddar, otherwise simply as cheese.
+Never add sauce to hamburgers
+
 
 Example 2: Milanese with Mashed Potatoes
 - If there is a meat Milanese (can be chicken) with mashed potatoes (or pumpkin), then the meat weighs an average of ~120g, the breadcrumbs average ~25g and the mashed potatoes weigh an average of ~180g., then you have to return the following dictionary: 

@@ -6,6 +6,10 @@ class UserCreate(BaseModel):
     lastName: str
     email: EmailStr
     password: str
+    # El valor de la ratio default es 15.0
+    ratio: Optional[float] = 15.0
+    sensitivity: Optional[float] = 50.0
+    glycemicTarget: Optional[int] = 100
 
 
 

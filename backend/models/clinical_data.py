@@ -7,8 +7,11 @@ if TYPE_CHECKING:
 
 class ClinicalData(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    ratio: float = Field(default=0.0) 
-    sensitivity: float = Field(default=0.0) 
+    
+    ratio: float = Field(default=15.0) # Una unidad de insulina por 15 gramos de carbohidratos 
+    sensitivity: float = Field(default=0.0) # Cuánto baja la glucosa por cada unidad de insulina
+    glycemicTarget: int = Field(default=100) # mg/dL
+
 
     user_id: Optional[int] = Field(
         default=None,

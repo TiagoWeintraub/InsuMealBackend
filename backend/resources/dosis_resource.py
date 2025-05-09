@@ -41,10 +41,17 @@ class DosisResource:
             ingredients_resource = IngredientResource(self.session)
             meal_plate_with_ingredients = ingredients_resource.read_ingredients_by_meal_plate(meal_plate_id)
 
-            print("RESPUESTA BIEN: ", meal_plate_with_ingredients)
+            # Traigo los datos de ClinicalData
+            clinical_data = clinical_resource.get_by_user_id(current_user.id)
+            if not clinical_data:
+                raise HTTPException(status_code=400, detail="Datos clínicos no encontrados")
+            
+            ratio = clinical_data.ratio
+            sensitivity = clinical_data.sensitivity
+            glycemic_target = clinical_data.glycemicTarget
 
-            # Calcular la suma de carbs
-            total_carbs = sum(ingredient['carbs'] for ingredient in meal_plate_with_ingredients['ingredients'])
+            # Obtenemos el total de carbohidratos del MealPlate 
+            total_carbs = meal_plate.totalCarbs
 
             # Calcular la dosis
             

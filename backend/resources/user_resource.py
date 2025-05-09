@@ -16,6 +16,18 @@ class UserResource:
         if UserResource.get_user_by_email(data.email, session):
             raise HTTPException(status_code=400, detail="Email ya registrado")
         
+            # Verifica si ya existe el email
+
+        # Validaciones para datos clínicos
+        if not 0 <= data.ratio <= 100:
+            raise HTTPException(status_code=400, detail="El ratio debe estar entre 0 y 100")
+        
+        if not 0 <= data.sensitivity <= 100:
+            raise HTTPException(status_code=400, detail="La sensibilidad debe estar entre 0 y 100")
+
+        if not 80 <= data.glycemicTarget <= 130:
+            raise HTTPException(status_code=400, detail="El objetivo glucémico debe estar entre 80 y 130")
+        
         # 1. Crear primero el usuario sin relaciones
         user = User(
             name=data.name,
@@ -31,7 +43,12 @@ class UserResource:
         # 2. Crear ClinicalData asociándoselo al usuario
         clinical_data_resource = ClinicalDataResource(session)
         clinical_data = clinical_data_resource.create(
-            ClinicalDataCreate(ratio=0.0, sensitivity=0.0, user_id=user.id)
+            ClinicalDataCreate(
+                ratio= data.ratio,
+                sensitivity= data.sensitivity,
+                glycemicTarget = data.glycemicTarget,
+                user_id=user.id
+                )
         )
         
         session.add(clinical_data)
