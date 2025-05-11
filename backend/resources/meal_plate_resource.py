@@ -3,6 +3,8 @@ from fastapi import HTTPException
 from fastapi.responses import Response
 from models.meal_plate import MealPlate
 from schemas.meal_plate_schema import MealPlateRead
+from schemas.meal_plate_schema import MealPlateUpdate
+from resources.ingredient_resource import IngredientResource
 
 class MealPlateResource:
     def __init__(self, session: Session):
@@ -28,6 +30,14 @@ class MealPlateResource:
         if not plate:
             raise HTTPException(status_code=404, detail="MealPlate no encontrado")
         return plate 
+
+    def get_last_by_user_id(self, user_id: int):
+        plate = self.session.exec(
+            select(MealPlate).where(MealPlate.user_id == user_id).order_by(MealPlate.created_at.desc())
+        ).first()
+        if not plate:
+            raise HTTPException(status_code=404, detail="MealPlate no encontrado")
+        return plate
 
     def get_all(self):
         meal_plates = self.session.exec(select(MealPlate)).all()
@@ -74,3 +84,20 @@ class MealPlateResource:
             self.session.delete(plate)
         self.session.commit()
         return {"msg": "Todos los Meal Plates eliminados exitosamente"}
+
+    def calculate_total_carbs(self, meal_plate_id: int):
+        total_carbs = 0.0
+        # Encuentra todos los ingredientes asociados al MealPlate
+        ingredient_resource = IngredientResource(self.session)
+        meal_plate_data = ingredient_resource.read_ingredients_by_meal_plate(meal_plate_id)
+        
+        # Iterar sobre la lista de ingredientes en el diccionario devuelto
+        for ingredient in meal_plate_data["ingredients"]:
+            # Sumar los carbohidratos de cada ingrediente
+            total_carbs += ingredient["carbs"]
+    
+        total_carbs = round(total_carbs, 2)
+        # Actualiza el total de carbohidratos en el MealPlate
+        self.update(meal_plate_id, MealPlateUpdate(totalCarbs=total_carbs))
+    
+        return total_carbs

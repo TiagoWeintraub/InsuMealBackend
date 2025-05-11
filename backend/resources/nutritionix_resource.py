@@ -11,9 +11,11 @@ from schemas.ingredient_schema import IngredientCreate
 from models.meal_plate import MealPlate
 from models.food_history import FoodHistory
 from resources.meal_plate_ingredient_resource import MealPlateIngredientResource
+from resources.meal_plate_resource import MealPlateResource
 from models.ingredient import Ingredient
 from schemas.meal_plate_ingredient_schema import MealPlateIngredientUpdate
 from resources.dosis_resource import DosisResource
+from utils.json_dict_converter import dict_to_json, json_to_dict
 import time
 
 
@@ -67,7 +69,10 @@ class NutritionixResource:
     def orquest(self, food_dic, meal_plate: MealPlate = None):  
         print("Iniciando la orquestación de nutritionix")
         name_and_carbs_dic = {}
-        totalCarbs = 0.0
+        
+        # Si food_dic es un json, lo convierte a un diccionario
+        if isinstance(food_dic, str):
+            food_dic = json_to_dict(food_dic)
 
         for key in food_dic.keys():
 
@@ -96,13 +101,14 @@ class NutritionixResource:
             
             print("\n\nAlimento:", normalized_api_food_name, "Carbohidratos:", food_data["carbs"],"\n\n")
             
-            totalCarbs += food_data["carbs"] # Se va sumando el total de carbohidratos
+            
+            time.sleep(2) # Se espera 2 segundos entre cada llamada a la API para evitar el rate limit
         
         # Se actualiza el total de carbohidratos en la tabla MealPlate
-        self.update_meal_plate_total_carbs(meal_plate.id, totalCarbs)
-        print("Total de carbohidratos:", totalCarbs)
+        self.update_meal_plate_total_carbs(meal_plate.id)
         
-        self.calculate_dosis(meal_plate.id)
+        
+        # self.calculate_dosis(meal_plate.id)
         
         return meal_plate
 
@@ -132,24 +138,22 @@ class NutritionixResource:
             grams=round(grams, 2),
             carbs=carbs
         )
-        
 
         updated_ingredient = resource.update(meal_plate_id, ingredient_id, data)
 
         return carbs 
     
-    def update_meal_plate_total_carbs(self, meal_plate_id: int, totalCarbs: float):
+    def update_meal_plate_total_carbs(self, meal_plate_id: int):
         print("Actualizando el total de carbs del MealPlate")
-        meal_plate = self.session.get(MealPlate, meal_plate_id)
-        if not meal_plate:
+        meal_plate_resource = MealPlateResource(self.session)
+        total_carbs = meal_plate_resource.calculate_total_carbs(meal_plate_id)
+        if not total_carbs:
             raise HTTPException(status_code=404, detail="MealPlate no encontrado")
-        meal_plate.totalCarbs = totalCarbs
-        self.session.add(meal_plate)
-        self.session.commit()
-        self.session.refresh(meal_plate)
-        return meal_plate
+        # Actualiza el total de carbohidratos en el MealPlate
+
+        return {"Ingrediente agregado correctamente"}
     
-    def calculate_dosis(self, meal_plate_id: int): # ESTE METODO NO VA, ES DE PRUEBA
-        dosis_resource = DosisResource(self.session)
-        dosis = dosis_resource.calculate(meal_plate_id, self.current_user)
-        return {"Dosis calculada correctamente {dosis}"}
+    # def calculate_dosis(self, meal_plate_id: int): # ESTE METODO NO VA, ES DE PRUEBA
+    #     dosis_resource = DosisResource(self.session)
+    #     dosis = dosis_resource.calculate(meal_plate_id, self.current_user)
+    #     return {"Dosis calculada correctamente {dosis}"}

@@ -46,10 +46,13 @@ class IngredientResource:
         return self.session.exec(select(Ingredient)).all()
 
 
-    def read_ingredients_by_meal_plate(self, meal_plate_id: int) -> MealPlate: # Trae todos los ingredientes de un MealPlate, y aparte por cada ingrediente trae la cantidad de gramos y carbohidratos de la tabla MealPlateIngredient
-        meal_plate = self.session.query(MealPlate).options(
-            selectinload(MealPlate.ingredients)
-        ).filter(MealPlate.id == meal_plate_id).first()
+    def read_ingredients_by_meal_plate(self, meal_plate_id: int) -> MealPlate:
+        # Reemplazamos query() (deprecado) por select() + exec()
+        meal_plate = self.session.exec(
+            select(MealPlate)
+            .options(selectinload(MealPlate.ingredients))
+            .where(MealPlate.id == meal_plate_id)
+        ).first()
 
         if not meal_plate:
             raise HTTPException(status_code=404, detail="MealPlate no encontrado")
@@ -74,7 +77,9 @@ class IngredientResource:
 
         return {
             "meal_plate_id": meal_plate.id,
-            "ingredients": ingredients_with_details
+            "totalCarbs": meal_plate.totalCarbs,
+            "dosis": meal_plate.dosis,
+            "ingredients": ingredients_with_details,
         }
 
     def update(self, ingredient_id: int, data: IngredientUpdate) -> Ingredient:

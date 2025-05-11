@@ -80,8 +80,6 @@ class GeminiResource:
             nutritional_api_dic = {k: v for k, v in food_text_dic.items() if k != list(food_text_dic.keys())[0]}
             print("El diccionario de alimentos que se le envía a nutritional_api es: ", nutritional_api_dic)
 
-
-            
             self.call_nutritional_api_resource(nutritional_api_dic, meal_plate ,current_user)
 
             return food_text_dic

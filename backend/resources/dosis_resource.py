@@ -16,12 +16,17 @@ import time
 load_dotenv()
 
 class DosisResource:
-    def __init__(self, session: Session):
+    def __init__(self, session: Session, current_user: User = None):
+        self.current_user = current_user
         self.session = session
     
-    def calculate(self, meal_plate_id: int, current_user: User = None): # Podría poner el mealplate en parámetros
+    def calculate(self, current_user: User = None): # Calcular la dosis 
         try:
-            print("Calculando dosis para MealPlate:", meal_plate_id)
+            # Busca el último MealPlate creado del usuario
+            meal_plate_resource = MealPlateResource(self.session)
+            meal_plate = meal_plate_resource.get_last_by_user_id(current_user.id)
+            
+            print("Calculando dosis para MealPlate:", meal_plate.id)
 
             clinical_resource = ClinicalDataResource(self.session, current_user=current_user)
             clinical_data = clinical_resource.get_by_user_id(current_user.id)
@@ -33,13 +38,6 @@ class DosisResource:
             sensitivity = clinical_data.sensitivity  # Asegúrate de que ratio existe
 
 
-            # Si pongo en parámetros me salteo esta query
-            meal_plate_resource = MealPlateResource(self.session)
-            meal_plate = meal_plate_resource.get_by_id(meal_plate_id)  # Esto ahora lanzará 404 si no existe
-
-            # Esta es 100% Necesaria
-            ingredients_resource = IngredientResource(self.session)
-            meal_plate_with_ingredients = ingredients_resource.read_ingredients_by_meal_plate(meal_plate_id)
 
             # Traigo los datos de ClinicalData
             clinical_data = clinical_resource.get_by_user_id(current_user.id)
@@ -69,7 +67,7 @@ class DosisResource:
             )
             
             # 4. Actualizar el meal_plate con la dosis calculada
-            meal_plate_resource.update(meal_plate_id, data)
+            meal_plate_resource.update(meal_plate.id, data)
 
             # return 
 
