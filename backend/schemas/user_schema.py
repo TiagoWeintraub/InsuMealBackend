@@ -9,7 +9,7 @@ class UserCreate(BaseModel):
     # El valor de la ratio default es 15.0
     ratio: Optional[float] = 15.0
     sensitivity: Optional[float] = 50.0
-    glycemicTarget: Optional[int] = 100
+    glycemiaTarget: Optional[int] = 100
 
 
 

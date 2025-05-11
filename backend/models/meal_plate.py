@@ -24,6 +24,15 @@ class MealPlate(SQLModel, table=True):
             nullable=False,
             index=True 
         )
+    )   
+
+    # Glucemia
+    glycemia: Optional[float] = Field(
+        default=100.0,
+        sa_column=Column(
+            Float,
+            nullable=True  
+        )
     )
 
     food_history_id: Optional[int] = Field(
@@ -31,7 +40,7 @@ class MealPlate(SQLModel, table=True):
         sa_column=Column( 
             Integer,
             ForeignKey("foodhistory.id", ondelete="CASCADE"), # FK con cascade
-            nullable=True # Permitir MealPlates sin FoodHistory 
+            nullable=False # Permitir MealPlates sin FoodHistory 
         )
     )
 

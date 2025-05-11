@@ -6,11 +6,11 @@ class ClinicalDataBase(BaseModel):
 class ClinicalDataCreate(ClinicalDataBase):
     ratio: float
     sensitivity: float
-    glycemicTarget: int
+    glycemiaTarget: int
     user_id: int
 
 
 class ClinicalDataUpdate(ClinicalDataBase):
     ratio: float
     sensitivity: float
-    glycemicTarget: int
+    glycemiaTarget: int

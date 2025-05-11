@@ -77,8 +77,10 @@ class IngredientResource:
 
         return {
             "meal_plate_id": meal_plate.id,
+            "meal_plate_name": meal_plate.type,
             "totalCarbs": meal_plate.totalCarbs,
             "dosis": meal_plate.dosis,
+            "glycemia": meal_plate.glycemia,
             "ingredients": ingredients_with_details,
         }
 

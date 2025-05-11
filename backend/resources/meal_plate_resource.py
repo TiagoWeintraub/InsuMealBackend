@@ -10,13 +10,14 @@ class MealPlateResource:
     def __init__(self, session: Session):
         self.session = session
 
-    def create(self, *, picture: bytes, mime_type: str, type: str, food_history_id: int, totalCarbs: float = None, dosis: float = None) -> MealPlate:
+    def create(self, *, picture: bytes, mime_type: str, type: str, food_history_id: int, totalCarbs: float = None, glycemia: float = 100, dosis: float = None) -> MealPlate:
         meal_plate = MealPlate(
             picture=picture,
             picture_mime_type=mime_type,
             type=type,
             food_history_id=food_history_id,
             totalCarbs=totalCarbs,
+            glycemia=glycemia,
             dosis=dosis
         )
         self.session.add(meal_plate)
@@ -31,13 +32,32 @@ class MealPlateResource:
             raise HTTPException(status_code=404, detail="MealPlate no encontrado")
         return plate 
 
+
     def get_last_by_user_id(self, user_id: int):
+        # Primero, obtener los food_history_ids del usuario
+        from models.food_history import FoodHistory
+        
+        food_histories = self.session.exec(
+            select(FoodHistory).where(FoodHistory.user_id == user_id)
+        ).all()
+        
+        if not food_histories:
+            raise HTTPException(status_code=404, detail="Historial de comidas no encontrado para este usuario")
+        
+        food_history_ids = [fh.id for fh in food_histories]
+        
+        # Buscar el meal_plate más reciente para ese usuario
         plate = self.session.exec(
-            select(MealPlate).where(MealPlate.user_id == user_id).order_by(MealPlate.created_at.desc())
+            select(MealPlate)
+            .where(MealPlate.food_history_id.in_(food_history_ids))
+            .order_by(MealPlate.id.desc())  # Ordenar por ID descendente asumiendo que IDs más altos son más recientes
         ).first()
+        
         if not plate:
             raise HTTPException(status_code=404, detail="MealPlate no encontrado")
+        
         return plate
+    
 
     def get_all(self):
         meal_plates = self.session.exec(select(MealPlate)).all()
@@ -48,6 +68,7 @@ class MealPlateResource:
                     id=plate.id,
                     type=plate.type,
                     totalCarbs=plate.totalCarbs,
+                    glycemia=plate.glycemia,
                     dosis=plate.dosis,
                     image_url=f"/meal_plate/image/{plate.id}"
                 )

@@ -20,59 +20,62 @@ class DosisResource:
         self.current_user = current_user
         self.session = session
     
-    def calculate(self, current_user: User = None): # Calcular la dosis 
+    def calculate(self, current_user: User = None, glycemia: float = None):
         try:
+            # Verifica la validez de la glucemia
+            if glycemia is None or glycemia < 0 or glycemia > 500:
+                raise HTTPException(status_code=400, detail="Glycemia no válida")
+            
+            # Usa el usuario del objeto si no se proporciona uno
+            user = current_user if current_user else self.current_user
+            
+            if not user or not user.id:
+                raise HTTPException(status_code=400, detail="Usuario no válido o no autenticado")
+            
             # Busca el último MealPlate creado del usuario
             meal_plate_resource = MealPlateResource(self.session)
-            meal_plate = meal_plate_resource.get_last_by_user_id(current_user.id)
+            try:
+                meal_plate = meal_plate_resource.get_last_by_user_id(user.id)
+                if not meal_plate:
+                    raise HTTPException(status_code=404, detail="No se encontró un MealPlate reciente para calcular la dosis")
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Error al obtener el último MealPlate: {str(e)}")
+
+            clinical_resource = ClinicalDataResource(self.session, current_user=user)
+            clinical_data = clinical_resource.get_by_user_id(user.id)
             
-            print("Calculando dosis para MealPlate:", meal_plate.id)
-
-            clinical_resource = ClinicalDataResource(self.session, current_user=current_user)
-            clinical_data = clinical_resource.get_by_user_id(current_user.id)
-
-            if not clinical_data:
-                raise HTTPException(status_code=400, detail="Datos clínicos no encontrados")
-
-            ratio = clinical_data.ratio  # Asegúrate de que ratio existe
-            sensitivity = clinical_data.sensitivity  # Asegúrate de que ratio existe
-
-
-
-            # Traigo los datos de ClinicalData
-            clinical_data = clinical_resource.get_by_user_id(current_user.id)
             if not clinical_data:
                 raise HTTPException(status_code=400, detail="Datos clínicos no encontrados")
             
             ratio = clinical_data.ratio
             sensitivity = clinical_data.sensitivity
-            glycemic_target = clinical_data.glycemicTarget
-
+            glycemia_target = clinical_data.glycemiaTarget
+    
             # Obtenemos el total de carbohidratos del MealPlate 
             total_carbs = meal_plate.totalCarbs
-
-            # Calcular la dosis
             
+            if not total_carbs:
+                raise HTTPException(status_code=400, detail="El MealPlate no tiene carbohidratos registrados")
+    
+            # Calcular la insulina necesaria para corregir la glucosa (Sensibilidad)
+            correction_insulin = (glycemia - glycemia_target) / sensitivity 
             
+            # Calcular la insulina necesaria para los carbohidratos (Ratio)
+            carb_insulin = total_carbs / ratio
             
-            
-            calculated_dosis = 0.0
-            
-            
-            
-            # 
+            # Dosis total de insulina
+            total_dosis = round(correction_insulin + carb_insulin, 2)
+    
             data = MealPlateUpdate(
-                totalCarbs= total_carbs,
-                dosis  = calculated_dosis
+                dosis = total_dosis,
+                glycemia = glycemia
             )
-            
-            # 4. Actualizar el meal_plate con la dosis calculada
+    
             meal_plate_resource.update(meal_plate.id, data)
-
-            # return 
-
+            
+            return {"dosis": total_dosis, "glycemia": glycemia}
+            
         except HTTPException as http_exc:
-            print(f"Error HTTP en calculate_dosis: {http_exc.detail}")
             raise
         except Exception as e:
             print(f"Error inesperado en calculate_dosis: {str(e)}")

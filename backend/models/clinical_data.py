@@ -10,7 +10,7 @@ class ClinicalData(SQLModel, table=True):
     
     ratio: float = Field(default=15.0) # Una unidad de insulina por 15 gramos de carbohidratos 
     sensitivity: float = Field(default=0.0) # Cuánto baja la glucosa por cada unidad de insulina
-    glycemicTarget: int = Field(default=100) # mg/dL
+    glycemiaTarget: int = Field(default=100) # mg/dL
 
 
     user_id: Optional[int] = Field(

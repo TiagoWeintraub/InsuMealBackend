@@ -25,7 +25,7 @@ class UserResource:
         if not 0 <= data.sensitivity <= 100:
             raise HTTPException(status_code=400, detail="La sensibilidad debe estar entre 0 y 100")
 
-        if not 80 <= data.glycemicTarget <= 130:
+        if not 80 <= data.glycemiaTarget <= 130:
             raise HTTPException(status_code=400, detail="El objetivo glucémico debe estar entre 80 y 130")
         
         # 1. Crear primero el usuario sin relaciones
@@ -46,7 +46,7 @@ class UserResource:
             ClinicalDataCreate(
                 ratio= data.ratio,
                 sensitivity= data.sensitivity,
-                glycemicTarget = data.glycemicTarget,
+                glycemiaTarget = data.glycemiaTarget,
                 user_id=user.id
                 )
         )
