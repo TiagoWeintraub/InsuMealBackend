@@ -81,7 +81,11 @@ class IngredientResource:
                     "carbs": meal_plate_ingredient.carbs
                 })
 
+        # dejamos solo mostrando la fecha con DD/MM/YYYY - hh:mm
+        date = meal_plate.date.strftime("%d/%m/%Y - %H:%M")
+        
         return {
+            "date": date,
             "meal_plate_id": meal_plate.id,
             "meal_plate_name": meal_plate.type,
             "totalCarbs": meal_plate.totalCarbs,

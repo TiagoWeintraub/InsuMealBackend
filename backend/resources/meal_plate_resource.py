@@ -63,8 +63,10 @@ class MealPlateResource:
         meal_plates = self.session.exec(select(MealPlate)).all()
         result = []
         for plate in meal_plates:
+            formated_date = plate.date.strftime("%d/%m/%Y - %H:%M")
             result.append(
                 MealPlateRead(
+                    date=formated_date,
                     id=plate.id,
                     type=plate.type,
                     totalCarbs=plate.totalCarbs,

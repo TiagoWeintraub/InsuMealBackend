@@ -21,6 +21,7 @@ class MealPlateCreate:
         self.picture = picture
 
 class MealPlateRead(BaseModel):
+    date: str
     id: int
     type: str
     totalCarbs: Optional[float]
