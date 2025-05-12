@@ -45,6 +45,12 @@ class IngredientResource:
     def get_all(self):
         return self.session.exec(select(Ingredient)).all()
 
+    def get_by_id(self, ingredient_id: int) -> Ingredient:
+        ingredient = self.session.get(Ingredient, ingredient_id)
+        if not ingredient:
+            raise HTTPException(status_code=404, detail="Ingredient no encontrado")
+        return ingredient
+
 
     def read_ingredients_by_meal_plate(self, meal_plate_id: int) -> MealPlate:
         # Reemplazamos query() (deprecado) por select() + exec()

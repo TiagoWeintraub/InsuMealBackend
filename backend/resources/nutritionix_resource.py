@@ -101,14 +101,7 @@ class NutritionixResource:
             
             print("\n\nAlimento:", normalized_api_food_name, "Carbohidratos:", food_data["carbs"],"\n\n")
             
-            
             time.sleep(1) # Se espera 1 segundo entre cada llamada a la API para evitar el rate limit
-        
-        # Se actualiza el total de carbohidratos en la tabla MealPlate
-        self.update_meal_plate_total_carbs(meal_plate.id)
-        
-        
-        # self.calculate_dosis(meal_plate.id)
         
         return meal_plate
 
@@ -142,13 +135,4 @@ class NutritionixResource:
         updated_ingredient = resource.update(meal_plate_id, ingredient_id, data)
 
         return carbs 
-    
-    def update_meal_plate_total_carbs(self, meal_plate_id: int):
-        print("Actualizando el total de carbs del MealPlate")
-        meal_plate_resource = MealPlateResource(self.session)
-        total_carbs = meal_plate_resource.calculate_total_carbs(meal_plate_id)
-        if not total_carbs:
-            raise HTTPException(status_code=404, detail="MealPlate no encontrado")
-        # Actualiza el total de carbohidratos en el MealPlate
 
-        return {"Ingrediente agregado correctamente"}

@@ -122,3 +122,12 @@ class MealPlateResource:
         self.update(meal_plate_id, MealPlateUpdate(totalCarbs=total_carbs))
     
         return total_carbs
+
+    # Metodo para calcular el total de carbohidratos de un solo ingrediente
+    def calculate_ingredient_total_carbs(self, ingredient_id: int, grams: float):
+        ingredient_resource = IngredientResource(self.session)
+        ingredient = ingredient_resource.get_by_id(ingredient_id)
+        if not ingredient:
+            raise HTTPException(status_code=404, detail="Ingrediente no encontrado")
+        carbs = round((ingredient.carbsPerHundredGrams * grams) / 100, 2)
+        return carbs

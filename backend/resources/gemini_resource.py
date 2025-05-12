@@ -72,13 +72,12 @@ class GeminiResource:
             if not food_history:
                 raise HTTPException(status_code=404, detail="No se encontró historial de comidas para este usuario.")
 
-            # Se busca el último MealPlate del usuario
-            meal_plate = self.create_meal_plate(imagen, mime_type, food_history.id, food_text_dic)
-
-
             # Al recurso call nutritional_api se le envia el diccionario de alimentos sin el primer elemento clave-valor
             nutritional_api_dic = {k: v for k, v in food_text_dic.items() if k != list(food_text_dic.keys())[0]}
             print("El diccionario de alimentos que se le envía a nutritional_api es: ", nutritional_api_dic)
+
+            # Se crea el MealPlate
+            meal_plate = self.create_meal_plate(imagen, mime_type, food_history.id, food_text_dic)
 
             self.call_nutritional_api_resource(nutritional_api_dic, meal_plate ,current_user)
 
@@ -107,6 +106,13 @@ class GeminiResource:
                     pass
                 food_dict[key] = value
             print("Diccionario de alimentos extraído")
+                        # A todas los values del diccionario se los convierte en float
+            for key in food_dict:
+                if isinstance(food_dict[key], str):
+                    try:
+                        food_dict[key] = float(food_dict[key])
+                    except ValueError:
+                        pass 
             return food_dict
         else:
             print("No se encontró el diccionario en el texto.")
@@ -138,10 +144,6 @@ class GeminiResource:
         return compressed_data
 
     def call_nutritional_api_resource(self, food_dic, meal_plate: MealPlate ,current_user: User) -> None:
-
-        # edamam_resource = EdamamResource(self.session, current_user)
-        # edamam_resource.orquest(food_dic)
-        
         nutritionix_resource = NutritionixResource(self.session, current_user)
         nutritionix_resource.orquest(food_dic,meal_plate)
         print("Se ha llamado a la Api Nutricional")

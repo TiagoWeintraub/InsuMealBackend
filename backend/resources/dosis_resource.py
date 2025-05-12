@@ -20,7 +20,7 @@ class DosisResource:
         self.current_user = current_user
         self.session = session
     
-    def calculate(self, current_user: User = None, glycemia: float = None):
+    def calculate(self, current_user: User = None, glycemia: float = None,  meal_plate_id = int):
         try:
             # Verifica la validez de la glucemia
             if glycemia is None or glycemia < 0 or glycemia > 500:
@@ -35,7 +35,7 @@ class DosisResource:
             # Busca el último MealPlate creado del usuario
             meal_plate_resource = MealPlateResource(self.session)
             try:
-                meal_plate = meal_plate_resource.get_last_by_user_id(user.id)
+                meal_plate = meal_plate_resource.get_by_id(meal_plate_id)
                 if not meal_plate:
                     raise HTTPException(status_code=404, detail="No se encontró un MealPlate reciente para calcular la dosis")
             except Exception as e:
@@ -58,10 +58,13 @@ class DosisResource:
                 raise HTTPException(status_code=400, detail="El MealPlate no tiene carbohidratos registrados")
     
             # Calcular la insulina necesaria para corregir la glucosa (Sensibilidad)
+            print(f"Glucemia: {glycemia}, Glucemia objetivo: {glycemia_target}, Sensibilidad: {sensitivity}")
             correction_insulin = (glycemia - glycemia_target) / sensitivity 
+            print(f"Insulina de corrección: {correction_insulin}")
             
             # Calcular la insulina necesaria para los carbohidratos (Ratio)
             carb_insulin = total_carbs / ratio
+            print(f"Insulina para carbohidratos: {carb_insulin}")
             
             # Dosis total de insulina
             total_dosis = round(correction_insulin + carb_insulin, 2)
