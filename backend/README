@@ -4,5 +4,5 @@
 ps aux | grep postgres
 
 3 Levantar el server:
-uvicorn main:app --reload
+uvicorn __init__:app --reload
 

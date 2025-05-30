@@ -17,6 +17,11 @@ load_dotenv()
 
 app = FastAPI()
 
+@app.get("/")
+def read_root():
+    return {"message": "API InsuMeal funcionando"}
+
+
 # drop_db()  # Descomentar para borrar la base de datos antes de crearla
 
 inspector() 

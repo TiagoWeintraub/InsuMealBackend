@@ -82,15 +82,3 @@ aaa = {
         }
     ]
 }
-
-
-json_string = dict_to_json(aaa)
-print("JSON String:", json_string)
-
-# itero por cada ingrediente e imprimo el nombre y los gramos
-for ingredient in aaa["ingredients"]:
-    print("Nombre:", ingredient["name"])
-    print("Gramos:", ingredient["grams"])
-    print("Carbohidratos:", ingredient["carbs"])
-    print("Carbohidratos por cada 100 gramos:", ingredient["carbsPerHundredGrams"])
-    print()
