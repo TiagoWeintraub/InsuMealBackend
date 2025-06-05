@@ -5,4 +5,11 @@ ps aux | grep postgres
 
 3 Levantar el server:
 uvicorn __init__:app --reload
+uvicorn __init__:app --reload --host 0.0.0.0 --port 8000
 
+4  Obtener la ip de la pc en mac: 
+    1. Opción para ver todas las ip: ifconfig | grep inet 
+    2. Para obtener solo la ip de mi pc: ipconfig getifaddr en0 
+
+5 Si se necesita exponer el server con ngrok
+ngrok http 
