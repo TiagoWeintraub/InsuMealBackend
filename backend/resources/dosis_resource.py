@@ -67,16 +67,25 @@ class DosisResource:
             print(f"Insulina para carbohidratos: {carb_insulin}")
             
             # Dosis total de insulina
-            total_dosis = round(correction_insulin + carb_insulin, 2)
+            total_dose = round(correction_insulin + carb_insulin, 2)
     
             data = MealPlateUpdate(
-                dosis = total_dosis,
+                dosis = total_dose,
                 glycemia = glycemia
             )
     
             meal_plate_resource.update(meal_plate.id, data)
             
-            return {"dosis": total_dosis, "glycemia": glycemia}
+            response = {
+                "meal_plate_id": meal_plate.id,
+                "glycemia": int(glycemia),
+                "total_carbs": total_carbs,
+                "correction_insulin": round(correction_insulin, 2),
+                "carb_insulin": round(carb_insulin, 2),
+                "total_dose": total_dose,
+            }
+            
+            return response
             
         except HTTPException as http_exc:
             raise

@@ -80,8 +80,14 @@ class GeminiResource:
             meal_plate = self.create_meal_plate(imagen, mime_type, food_history.id, food_text_dic)
 
             self.call_nutritional_api_resource(nutritional_api_dic, meal_plate ,current_user)
+            
+            # Devolvemos el id del meal plate con un mensaje de éxito 
+            response = {
+                "meal_plate_id": meal_plate.id,
+                "message": "Imagen analizada: MealPlate y sus ingredientes creados exitosamente."}
 
-            return food_text_dic
+
+            return response
 
         except HTTPException as http_exc:
             print(f"Error HTTP: {http_exc.detail}")

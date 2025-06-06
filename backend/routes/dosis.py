@@ -41,8 +41,8 @@ async def calculate_dosis( data: Glycemia, current_user: User = Depends(get_curr
         # Luego se calcula la dosis de insulina
         dosis_resource = DosisResource(session, current_user)
         dosis = dosis_resource.calculate(current_user,data.glycemia, meal_plate_id)
-
-        return {"message": "Dosis calculada correctamente", "dosis": dosis, "glycemia": data.glycemia}
+        print("Dosis calculada correctamente")
+        return dosis
     except HTTPException as e:
         raise e
     except Exception as e:
