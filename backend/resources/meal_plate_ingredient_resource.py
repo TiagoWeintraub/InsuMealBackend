@@ -47,3 +47,10 @@ class MealPlateIngredientResource:
             grams=meal_plate_ingredient.grams,
             carbs=meal_plate_ingredient.carbs
         )
+    
+    def add_ingredient_to_meal_plate(self, meal_plate_id: int, ingredient_id: int, grams: float) -> MealPlateIngredient:
+        meal_plate_ingredient = MealPlateIngredient(meal_plate_id=meal_plate_id, ingredient_id=ingredient_id, grams=grams)
+        self.session.add(meal_plate_ingredient)
+        self.session.commit()
+        self.session.refresh(meal_plate_ingredient)
+        return meal_plate_ingredient

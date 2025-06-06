@@ -50,6 +50,14 @@ class IngredientResource:
         if not ingredient:
             raise HTTPException(status_code=404, detail="Ingredient no encontrado")
         return ingredient
+    
+    def get_by_name(self, normalized_name: str) -> Ingredient:
+        ingredient = self.session.exec(
+            select(Ingredient).where(Ingredient.name == normalized_name)
+        ).first()
+        if not ingredient:
+            raise HTTPException(status_code=404, detail="Ingredient no encontrado")
+        return ingredient
 
 
     def read_ingredients_by_meal_plate(self, meal_plate_id: int) -> MealPlate:

@@ -31,18 +31,32 @@ class GeminiResource:
 
     def create_meal_plate(self, imagen: bytes, mime_type: str, food_history_id: int, food_text_dic) -> None:
         meal_plate_resource = MealPlateResource(self.session)
+        
+        meal_type = 'unknown'
+        if food_text_dic and len(food_text_dic.keys()) > 0:
+            meal_type = str(list(food_text_dic.keys())[0]).lower()
+        
         response = meal_plate_resource.create(
             picture=imagen,
             mime_type=mime_type,
-            type= str(list(food_text_dic.keys())[0]).lower(),
+            type= meal_type,
             food_history_id=food_history_id,
-            totalCarbs=0.0,
+            totalCarbs=0,
             dosis=0.0,
         )
+        
         return response
 
     def analyze_image(self, image_data: bytes, current_user: User) -> Union[str, dict]:
         try:
+            # Verificamos las dimensiones de la imagen y si es válida
+            if not image_data or len(image_data) == 0:
+                raise HTTPException(status_code=400, detail="No se ha proporcionado una imagen válida.")
+            
+            # Dimensiones recibidas
+            print(f"Dimensiones de la imagen recibida: {len(image_data)} bytes")
+            
+            
             # Reducimos el peso de la imagen 
             imagen = self.reduce_image_weight(image_data)
             # Convertimos la imagen a un objeto de tipo Image
@@ -63,6 +77,12 @@ class GeminiResource:
             
             food_text_dic = self.clean_data(response.text)
             print("La respuesta de Gemini ha sido limpiada")
+            
+            if not food_text_dic:
+                raise HTTPException(
+                    status_code=422, 
+                    detail="No se pudo extraer información de los alimentos de la imagen. Por favor, intenta con otra imagen más clara."
+            )
 
             # Se busca el FoodHistory del usuario
             food_history = self.session.exec(
@@ -78,32 +98,38 @@ class GeminiResource:
 
             # Se crea el MealPlate
             meal_plate = self.create_meal_plate(imagen, mime_type, food_history.id, food_text_dic)
+            
+            print("MealPlate creado exitosamente:", meal_plate)
 
             self.call_nutritional_api_resource(nutritional_api_dic, meal_plate ,current_user)
             
-            # Devolvemos el id del meal plate con un mensaje de éxito 
-            response = {
-                "meal_plate_id": meal_plate.id,
-                "message": "Imagen analizada: MealPlate y sus ingredientes creados exitosamente."}
-
-
-            return response
+            # Asegurar que todo se guarda correctamente
+            self.session.commit()
+            return meal_plate.id
 
         except HTTPException as http_exc:
             print(f"Error HTTP: {http_exc.detail}")
+            self.session.rollback()  
             raise http_exc
         except Exception as e:
             print(f"Error inesperado: {str(e)}")
+            self.session.rollback()
             raise HTTPException(status_code=500, detail="Error interno del servidor")
 
     def clean_data(self, data: str) -> dict:
+        print("\n\n\nLos datos recibidos de Gemini son: ", data)
         match = re.search(r"food\s*=\s*({.*?})", data, re.DOTALL)
         if match:
             dict_str = match.group(1)
             food_dict = {}
             items = dict_str[1:-1].split(",")  # Eliminar llaves y separar
             for item in items:
-                key_value = item.split(":")
+                # Verificar que el item contiene ":"
+                if ":" not in item:
+                    print(f"Elemento mal formateado: {item} - saltando")
+                    continue
+
+                key_value = item.split(":", 1)  # Limitar a un solo split
                 key = key_value[0].strip().strip("'\"")
                 value = key_value[1].strip()
                 try:
@@ -112,7 +138,7 @@ class GeminiResource:
                     pass
                 food_dict[key] = value
             print("Diccionario de alimentos extraído")
-                        # A todas los values del diccionario se los convierte en float
+            # A todas los values del diccionario se los convierte en float
             for key in food_dict:
                 if isinstance(food_dict[key], str):
                     try:
@@ -122,34 +148,49 @@ class GeminiResource:
             return food_dict
         else:
             print("No se encontró el diccionario en el texto.")
+            return {}
     
     def reduce_image_weight(self, image_data: bytes, target_max_kb=500) -> bytes:
-        target_max_bytes = target_max_kb * 1024
-        image = Image.open(io.BytesIO(image_data))
-        image = ImageOps.exif_transpose(image)
-        if image.mode != "RGB":
-            image = image.convert("RGB")
-        max_dimension = 1024  
-        if max(image.size) > max_dimension:
-            image.thumbnail((max_dimension, max_dimension), Resampling.LANCZOS)
-        quality = 90
-        output = io.BytesIO()
-        image.save(output, format="JPEG", quality=quality)
-        while output.tell() > target_max_bytes and quality > 10:
-            quality -= 5
+        # Solo se reduce si la dimesion de la imagen es mayor a 300x300
+        if len(image_data) > 300 * 300:
+            target_max_bytes = target_max_kb * 1024
+            image = Image.open(io.BytesIO(image_data))
+            image = ImageOps.exif_transpose(image)
+            if image.mode != "RGB":
+                image = image.convert("RGB")
+            max_dimension = 1024  
+            if max(image.size) > max_dimension:
+                image.thumbnail((max_dimension, max_dimension), Resampling.LANCZOS)
+            quality = 90
             output = io.BytesIO()
             image.save(output, format="JPEG", quality=quality)
-        compressed_data = output.getvalue()
-        final_size_kb = len(compressed_data) / 1024
-        if image_data == compressed_data:
-            print("La imagen no ha cambiado de peso y sus dimensiones son las mismas.")
+            while output.tell() > target_max_bytes and quality > 10:
+                quality -= 5
+                output = io.BytesIO()
+                image.save(output, format="JPEG", quality=quality)
+            compressed_data = output.getvalue()
+            final_size_kb = len(compressed_data) / 1024
+            if image_data == compressed_data:
+                print("La imagen no ha cambiado de peso y sus dimensiones son las mismas.")
+            else:
+                print(f"Peso final: {final_size_kb:.2f} KB con calidad {quality}")
+                print(f"Dimensiones finales: {image.size}")
+            print("Imagen comprimida")
+            return compressed_data
         else:
-            print(f"Peso final: {final_size_kb:.2f} KB con calidad {quality}")
-            print(f"Dimensiones finales: {image.size}")
-        print("Imagen comprimida")
-        return compressed_data
+            print("La imagen es demasiado pequeña para ser comprimida.")
+            return image_data
+    
 
     def call_nutritional_api_resource(self, food_dic, meal_plate: MealPlate ,current_user: User) -> None:
-        nutritionix_resource = NutritionixResource(self.session, current_user)
-        nutritionix_resource.orquest(food_dic,meal_plate)
-        print("Se ha llamado a la Api Nutricional")
+        try:
+            nutritionix_resource = NutritionixResource(self.session, current_user)
+            nutritionix_resource.orquest(food_dic, meal_plate)
+    
+            self.session.commit()
+        
+            print("Se ha llamado a la Api Nutricional")
+        except Exception as e:
+            self.session.rollback()
+            print(f"Error al procesar la información nutricional: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Error al procesar la información nutricional: {str(e)}")

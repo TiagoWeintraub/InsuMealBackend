@@ -6,6 +6,7 @@ from models.user import User
 from database import get_session
 from resources.usda_resource import UsdaResource
 from resources.nutritionix_resource import NutritionixResource
+from resources.ingredient_resource import IngredientResource
 router = APIRouter()
 
 @router.post("/gemini/analyze-image")
@@ -15,8 +16,11 @@ async def analyze_image(file: UploadFile = File(default=None), current_user: Use
     try:
         image_bytes = await file.read()
         vision_resource = GeminiResource(session)
-        result = vision_resource.analyze_image(image_bytes, current_user)
-        return {"result": result}
+        meal_plate_id = vision_resource.analyze_image(image_bytes, current_user)
+        
+        resource = IngredientResource(session)
+        return resource.read_ingredients_by_meal_plate(meal_plate_id)
+        
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al procesar la imagen: {str(e)}")
 

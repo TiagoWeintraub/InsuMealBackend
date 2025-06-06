@@ -9,7 +9,7 @@ from resources.meal_plate_resource import MealPlateResource
 
 router = APIRouter(prefix="/meal_plate_ingredient", tags=["meal_plate_ingredient"], include_in_schema=True)
 
-@router.put("/{meal_plate_id}/{ingredient_id}")
+@router.put("/{meal_plate_id}/{ingredient_id}") 
 async def update_meal_plate_ingredient(
     meal_plate_id: int,
     ingredient_id: int,
