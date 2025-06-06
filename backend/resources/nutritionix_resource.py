@@ -69,53 +69,58 @@ class NutritionixResource:
     def orquest(self, food_dic, meal_plate: MealPlate = None):  
         print("Iniciando la orquestación de nutritionix")
         name_and_carbs_dic = {}
-
+    
         # Si food_dic es un json, lo convierte a un diccionario
         if isinstance(food_dic, str):
             food_dic = json_to_dict(food_dic)
-
+    
         for key in food_dic.keys():
             normalized_food = key.lower()
             grams = food_dic[key]
-
+    
             # Verificar si el ingrediente ya existe en la base de datos
             ingredient_resource = IngredientResource(self.session)
-            existing_ingredient = ingredient_resource.get_by_name(normalized_food)
-
-            if existing_ingredient:
+            
+            try:
+                existing_ingredient = ingredient_resource.get_by_name(normalized_food)
+                
                 # Si el ingrediente ya existe, usamos sus datos directamente
                 print(f"Ingrediente '{normalized_food}' encontrado en la base de datos")
                 normalized_api_food_name = normalized_food
                 carbs_per_hundred = existing_ingredient.carbsPerHundredGrams
-                IngredientId = existing_ingredient.id
-
-                
-            else:
-                # Si no existe, hacemos la petición a la API
-                print(f"Buscando ingrediente '{normalized_food}' en Nutritionix API")
-                food_data = self.post_food_by_natural_language(normalized_food, grams)
-                normalized_api_food_name = food_data["food_name"].lower()
-                carbs_per_hundred = food_data["carbs"]
-
-                # Creamos el ingrediente usando el nombre normalizado
-                self.create_ingredient(meal_plate.id, normalized_api_food_name, carbs_per_hundred)
-                time.sleep(1)  # Se espera 1 segundo entre cada llamada a la API para evitar el rate limit
-
+                ingredientId = existing_ingredient.id
+            except HTTPException as e:
+                if e.status_code == 404:
+                    # Si no existe, hacemos la petición a la API
+                    print(f"Buscando ingrediente '{normalized_food}' en Nutritionix API")
+                    food_data = self.post_food_by_natural_language(normalized_food, grams)
+                    normalized_api_food_name = food_data["food_name"].lower()
+                    carbs_per_hundred = food_data["carbs"]
+    
+                    # Creamos el ingrediente usando el nombre normalizado
+                    self.create_ingredient(meal_plate.id, normalized_api_food_name, carbs_per_hundred)
+                    
+                    # Obtenemos el ID del ingrediente recién creado
+                    new_ingredient = self.session.exec(
+                        select(Ingredient).where(Ingredient.name == normalized_api_food_name)
+                    ).first()
+                    ingredientId = new_ingredient.id
+                    
+                    time.sleep(1)  # Se espera 1 segundo entre cada llamada a la API para evitar el rate limit
+                else:
+                    # Si es otro tipo de error, lo propagamos
+                    raise e
+    
             # Guardamos los datos en el diccionario
             name_and_carbs_dic[normalized_api_food_name] = {
                 "carbs": carbs_per_hundred,
             }
-
-            # Obtiene el ID del ingrediente
-            ingredientId = self.session.exec(
-                select(Ingredient).where(Ingredient.name == normalized_api_food_name)
-            ).first()
-
+    
             # Se actualiza la tabla MealPlateIngredient para que tenga los gramos y carbohidratos
-            calculated_carbs = self.update_meal_plate_ingredient(carbs_per_hundred, grams, ingredientId.id, meal_plate.id)
-
+            calculated_carbs = self.update_meal_plate_ingredient(carbs_per_hundred, grams, ingredientId, meal_plate.id)
+    
             print(f"\n\nAlimento: {normalized_api_food_name}, Carbohidratos: {carbs_per_hundred}, Gramos: {grams}, Total: {calculated_carbs}g\n\n")
-
+    
         return meal_plate
 
 
@@ -135,9 +140,9 @@ class NutritionixResource:
     
     def add_ingredient_to_meal_plate(self, ingredient_id: int, meal_plate_id: int):
         print("Agregando ingrediente al MealPlate en Nutritionix")
-        
+
         resource = MealPlateIngredientResource(self.session, current_user=self.current_user)
-        
+
         try:
             # Verifica si el ingrediente ya está asociado al MealPlate
             existing_ingredient = resource.get_one(meal_plate_id, ingredient_id)
@@ -148,21 +153,21 @@ class NutritionixResource:
             if e.status_code == 404:
                 # Si no existe, lo creamos directamente en la base de datos
                 print(f"Creando nueva relación MealPlateIngredient")
-                
+
                 # Crear un objeto MealPlateIngredient directamente
                 from models.meal_plate_ingredient import MealPlateIngredient
-                
+
                 meal_plate_ingredient = MealPlateIngredient(
                     meal_plate_id=meal_plate_id,
                     ingredient_id=ingredient_id,
                     grams=0.0,  # Valores iniciales que serán actualizados después
                     carbs=0.0
                 )
-                
+
                 self.session.add(meal_plate_ingredient)
                 self.session.commit()
                 self.session.refresh(meal_plate_ingredient)
-                
+
                 return meal_plate_ingredient
             else:
                 raise e
