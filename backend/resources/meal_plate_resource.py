@@ -60,7 +60,10 @@ class MealPlateResource:
     
 
     def get_all(self):
-        meal_plates = self.session.exec(select(MealPlate)).all()
+        meal_plates = self.session.exec(
+            select(MealPlate).order_by(MealPlate.date.desc())  # Ordenar por fecha descendente
+        ).all()
+        
         result = []
         for plate in meal_plates:
             formated_date = plate.date.strftime("%d/%m/%Y - %H:%M")

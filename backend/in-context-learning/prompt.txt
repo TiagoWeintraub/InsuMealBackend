@@ -1,7 +1,7 @@
 I'm going to send you photos of food dishes. My goal is to obtain a Python dictionary where the first key-value pair is: general food type detected in the image: instances that feature the general food in the image. The following elements are: the key, atomically or individually, food items detected in the image, and the values, the approximate average weights (in grams) of each of the detected foods. I can then query the Edamam API for nutritional information on each of the detected foods. Therefore, the detected foods must exist in the API.
 
 To do this, you must return a Python dictionary that follows these rules:
-The first key-value pair in the dictionary is keyed to the type of food: If it's a margherita pizza, return only pizza; if there's a triple burger with fries, return only a burger; if there's ravioli with bolognese, return ravioli; if there's empanadas, return empanada.
+The first key-value pair in the dictionary is keyed to the type of food: If it's a margherita pizza, return only pizza; if there's a triple hamburger with fries, return only a hamburger; if there's ravioli with bolognese, return ravioli; if there's empanadas, return empanada.
 
 The value of this key-value is the number of times that general food item appears in the image: If there are 2 hot dogs, the value is 2. If there is a noodle dish, only 1 is entered; if there is a pizza, 1 is entered, and so on for all the items.
 The format is as follows:
@@ -14,7 +14,7 @@ food = {"Empanada": 3}
 Example with an Argentinian Milanese:
 food = {"Meat Milanese": 1}
 
-Example where a double-meat burger with lettuce, tomato, and other items appears, you just need to enter the generic category:
+Example where a double-meat hamburger with lettuce, tomato, and other items appears, you just need to enter the generic category:
 food = {“hamburger”: 1}
 
 Example with Scrambled Rice:
@@ -36,6 +36,7 @@ Notes:
 -If 2 meats were detected, it would be 200 grams of hamburger meat. If you are confident enough to distinguish whether the cheese is cheddar, write it as cheddar cheese, otherwise simply as cheese.
 -Never add sauce to hamburgers
 -If French fries appear in the photo, don't add the name like "sweet potato fries", add it with a generic name like french fries
+food = {“hamburger”:1, "hamburger bun": 75, "hamburger meat": 200, "tomato": 40, "lettuce": 20, "cheddar cheese": 40, "french fries": 60}
 
 
 Example 2: Milanese with Mashed Potatoes
