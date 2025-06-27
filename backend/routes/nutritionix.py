@@ -112,26 +112,48 @@ def estimate_food_portions_with_gemini(food_list: list, meal_plate_name: str) ->
         foods_text = ", ".join(food_list)
         
         prompt = f"""
-You are an expert in nutrition and food portions. I need you to estimate the typical amounts in grams of the following foods when they appear on a "{meal_plate_name}" plate.
 
-Foods: {foods_text}
+You are an expert food analyst specializing in portion estimation. Your task is to provide a realistic weight estimation in grams for a given list of food ingredients, specifically within the context of a particular dish.
 
-Please provide a realistic estimate of the grams of each food item that would typically be served in this type of dish. Consider standard servings for an adult.
+Dish Context: "{meal_plate_name}"
+Ingredient List: "{foods_text}"
 
-Please respond ONLY in valid JSON format, without additional text, with this exact structure:
+Based on the Dish Context, estimate the typical weight in grams that each ingredient from the Ingredient List would have if served together as this meal.
+
+### Strict Output Rules:
+
+1.  JSON Only: You must respond ONLY with a valid JSON object. Do not include any explanations, apologies, or introductory sentences like "Here is the JSON...".
+2.  Exact Structure: The JSON object must be a single dictionary where:
+    *   Keys are the `string` names of the ingredients exactly as provided in the input list.
+    *   Values are the `number` (integer) representing your estimated weight in grams.
+3.  Context is Critical: The amount of an ingredient must be appropriate for the specified dish. For example, the amount of "cheese" on a "pizza" is much greater than the amount of "cheese" on a "taco".
+4.  Handle Irrelevance: If an ingredient from the list is highly unlikely to be in the specified dish (e.g., 'tuna' in a 'fruit smoothie'), estimate its weight as `0`.
+
+### Example Request & Response:
+
+Input:
+- Dish Context: "Large Pepperoni Pizza"
+- Ingredient List: "pizza dough, tomato sauce, mozzarella cheese, pepperoni, basil"
+
+Your Expected Response:
+Example 1:
 {{
-"food1": amount_in_grams,
-"food2": amount_in_grams
+    "pizza dough": 500
+
 }}
-
-Sample response:
+Example 2:
 {{
-    "rice": 150,
-    "chicken": 120,
-    "broccoli": 60
+    "tomato sauce": 200
+}}
+Example 3:
+{{
+    "mozzarella cheese": 250
 }}
 """
-        
+
+
+
+
         print(f"Consultando a Gemini para estimar porciones en plato '{meal_plate_name}'")
         response = model.generate_content(prompt)
         

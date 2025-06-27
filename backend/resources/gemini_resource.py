@@ -120,11 +120,51 @@ class GeminiResource:
 
     def clean_data(self, data: str) -> dict:
         print("\n\n\nLos datos recibidos de Gemini son: ", data)
-        match = re.search(r"food\s*=\s*({.*?})", data, re.DOTALL)
-        if match:
-            dict_str = match.group(1)
+        
+        # Intentar múltiples patrones para extraer el diccionario
+        patterns = [
+            r"food\s*=\s*({.*?})",  # Patrón original: food = {...}
+            r"```python\s*({.*?})\s*```",  # Patrón para código Python con backticks
+            r"({.*?})",  # Patrón genérico para cualquier diccionario
+        ]
+        
+        dict_str = None
+        for pattern in patterns:
+            match = re.search(pattern, data, re.DOTALL)
+            if match:
+                dict_str = match.group(1)
+                print(f"Diccionario encontrado con patrón: {pattern}")
+                break
+        
+        if dict_str:
             food_dict = {}
-            items = dict_str[1:-1].split(",")  # Eliminar llaves y separar
+            # Limpiar el string del diccionario
+            dict_str = dict_str.strip()
+            if dict_str.startswith('{') and dict_str.endswith('}'):
+                dict_str = dict_str[1:-1]  # Eliminar llaves externas
+            
+            # Dividir por comas, pero cuidando las comillas
+            items = []
+            current_item = ""
+            in_quotes = False
+            quote_char = None
+            
+            for char in dict_str + ",":  # Añadir coma al final para procesar el último elemento
+                if char in ['"', "'"] and (not in_quotes or char == quote_char):
+                    if not in_quotes:
+                        in_quotes = True
+                        quote_char = char
+                    else:
+                        in_quotes = False
+                        quote_char = None
+                    current_item += char
+                elif char == "," and not in_quotes:
+                    if current_item.strip():
+                        items.append(current_item.strip())
+                    current_item = ""
+                else:
+                    current_item += char
+            
             for item in items:
                 # Verificar que el item contiene ":"
                 if ":" not in item:
@@ -133,14 +173,28 @@ class GeminiResource:
 
                 key_value = item.split(":", 1)  # Limitar a un solo split
                 key = key_value[0].strip().strip("'\"")
-                value = key_value[1].strip()
+                value = key_value[1].strip().strip(',')  # Eliminar coma al final si existe
+                
+                # Limpiar comillas del valor si es string
+                if value.startswith('"') and value.endswith('"'):
+                    value = value[1:-1]
+                elif value.startswith("'") and value.endswith("'"):
+                    value = value[1:-1]
+                
+                # Intentar convertir a número
                 try:
-                    value = int(value)
+                    if '.' in value:
+                        value = float(value)
+                    else:
+                        value = int(value)
                 except ValueError:
-                    pass
+                    pass  # Mantener como string si no se puede convertir
+                
                 food_dict[key] = value
-            print("Diccionario de alimentos extraído")
-            # A todas los values del diccionario se los convierte en float
+            
+            print("Diccionario de alimentos extraído:", food_dict)
+            
+            # Convertir todos los values a float si son strings numéricos
             for key in food_dict:
                 if isinstance(food_dict[key], str):
                     try:
