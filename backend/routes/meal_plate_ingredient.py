@@ -50,3 +50,16 @@ async def get_meal_plate_ingredient(
     resource = MealPlateIngredientResource(session)
     meal_plate_ingredient = resource.get_one(meal_plate_id, ingredient_id)
     return {"data": meal_plate_ingredient}
+
+
+# Elimina la relación entre un meal plate y un ingrediente
+@router.delete("/{meal_plate_id}/{ingredient_id}")
+async def delete_meal_plate_ingredient(
+    meal_plate_id: int,
+    ingredient_id: int,
+    current_user=Depends(get_current_user),  # Validar el token de acceso
+    session: Session = Depends(get_session)
+):
+    resource = MealPlateIngredientResource(session)
+    resource.delete(meal_plate_id, ingredient_id)
+    return {"message": "Ingrediente eliminado del plato exitosamente"}

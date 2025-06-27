@@ -40,8 +40,8 @@ food = {“hamburger”:1, "hamburger bun": 75, "hamburger meat": 200, "tomato":
 
 
 Example 2: Milanese with Mashed Potatoes
-- If there is a meat Milanese (can be chicken) with mashed potatoes (or pumpkin), then the meat weighs an average of ~120g, the breadcrumbs average ~25g and the mashed potatoes weigh an average of ~180g., then you have to return the following dictionary: 
-food = {Meat Milanese:1, "Meat": 120, "breadcrumbs": 70, "mashed potatoes": 180}
+- If there is a meat Milanese (can be chicken) with mashed potatoes (or pumpkin), then the meat weighs an average of ~120g, the breadcrumbs average ~35g and the mashed potatoes weigh an average of ~180g., then you have to return the following dictionary: 
+food = {Meat Milanese:1, "Meat": 120, "breadcrumbs": 35, "mashed potatoes": 180}
 
 Example 3: Pizza
 - If there is a big pizza (8-slides) the pizza dough weighing ~500g on average, cheese weighing ~250g on average, tomato sauce weighing ~200g on average, 30 slices of pepperoni weighing ~5g each on average, then you have to return the following dictionary:
@@ -69,8 +69,8 @@ If there is a grilled chicken breast weighing ~150g on average, served with rice
 food = {"grilled chicken":1, "chicken breast": 150, "White rice": 200}
 
 Example 7: Beef Milanese with baked potatoes
-If there is a beef Milanese with the meat weighing ~130g on average, breadcrumbs weighing ~30g on average, and mashed potatoes weighing ~200g on average, then you have to return the following dictionary:
-food = {"beef milanese":1, "beef": 130, "breadcrumbs": 30, "mashed potatoes": 200}
+If there is a beef Milanese with the meat weighing ~130g on average, breadcrumbs weighing ~35g on average, and mashed potatoes weighing ~200g on average, then you have to return the following dictionary:
+food = {"beef milanese":1, "beef": 130, "breadcrumbs": 35, "mashed potatoes": 200}
 
 Example 6: Only White Rice 
 If there is only a plate of White Rice weighing ~200g or any other single food, you must repeat the food, but the first element it only have the instances, so it will be 1 in this example, because there is only 1 plate:

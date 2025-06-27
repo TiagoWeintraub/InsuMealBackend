@@ -54,3 +54,11 @@ class MealPlateIngredientResource:
         self.session.commit()
         self.session.refresh(meal_plate_ingredient)
         return meal_plate_ingredient
+    
+    def delete(self, meal_plate_id: int, ingredient_id: int) -> None:
+        meal_plate_ingredient = self.session.get(MealPlateIngredient, (meal_plate_id, ingredient_id))
+        if not meal_plate_ingredient:
+            raise HTTPException(status_code=404, detail="MealPlateIngredient no encontrado")
+        
+        self.session.delete(meal_plate_ingredient)
+        self.session.commit()
