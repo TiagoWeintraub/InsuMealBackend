@@ -84,7 +84,8 @@ Common cases where you should break down food items:
 - Empanadas: empanada dough, minced meat, onion, hard-boiled egg, olives, etc.
 - Proteins and Milanese
 
-Important: If you don't know exactly what sauce or food is identified in the image, it's best not to enter it in the dictionary. Only enter the sauce or food if you know exactly what it is.
+Important: If you don't know exactly what sauce or food is identified in the image, it's best not to enter it in the dictionary. Only enter the sauce or food if you know exactly what it is. You should always focus on the food; NEVER NEVER return the dictionary with anything other than food. If there are no foods in the photo, you should return:
 
-It only returns the dictionary `food = {}`. If no food is detected in the image, or the image has nothing to do with food, it returns:
-food = {}
+Return an empty dictionary: food = {}
+
+NEVER RETURN PYTHON COMMENTS IN JSON

@@ -12,12 +12,13 @@ class UserResource:
     
     @staticmethod
     def create_user(data: UserCreate, session: Session) -> User:
+        # Limpiar espacios en blanco del email
+        clean_email = data.email.strip()
+        
         # Verifica si ya existe el email
-        if UserResource.get_user_by_email(data.email, session):
+        if UserResource.get_user_by_email(clean_email, session):
             raise HTTPException(status_code=400, detail="Email ya registrado")
         
-            # Verifica si ya existe el email
-
         # Validaciones para datos clínicos
         if not 0 <= data.ratio <= 100:
             raise HTTPException(status_code=400, detail="El ratio debe estar entre 0 y 100")
@@ -32,7 +33,7 @@ class UserResource:
         user = User(
             name=data.name,
             lastName=data.lastName,
-            email=data.email
+            email=clean_email  # Usar el email limpio
         )
         user.plain_password = data.password
 
@@ -72,8 +73,9 @@ class UserResource:
     
     @staticmethod
     def get_user_by_email(email: str, session: Session):
-        # Retorna el usuario si existe, sino retorna None
-        return session.exec(select(User).where(User.email == email)).first()
+        # Limpiar espacios en blanco del email y retorna el usuario si existe, sino retorna None
+        clean_email = email.strip()
+        return session.exec(select(User).where(User.email == clean_email)).first()
 
     @staticmethod
     def get_user_by_id(user_id: int, session: Session):
@@ -113,7 +115,10 @@ class UserResource:
 
     @staticmethod
     def login_user(data: LoginInput, session: Session):
-        user = session.exec(select(User).where(User.email == data.email)).first()
+        # Limpiar espacios en blanco del email
+        clean_email = data.email.strip()
+        
+        user = session.exec(select(User).where(User.email == clean_email)).first()
         if not user or not user.validate_pass(data.password):
             raise HTTPException(status_code=400, detail="Credenciales inválidas")
         

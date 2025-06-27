@@ -96,7 +96,9 @@ class GeminiResource:
             nutritional_api_dic = {k: v for k, v in food_text_dic.items() if k != list(food_text_dic.keys())[0]}
             print("El diccionario de alimentos que se le envía a nutritional_api es: ", nutritional_api_dic)
 
-            # Se crea el MealPlate
+            # Se crea el MealPlate solo si el diccionario de alimentos no está vacío
+            if not nutritional_api_dic or len(nutritional_api_dic) == 0:
+                return -1
             meal_plate = self.create_meal_plate(imagen, mime_type, food_history.id, food_text_dic)
             
             print("MealPlate creado exitosamente:", meal_plate)
