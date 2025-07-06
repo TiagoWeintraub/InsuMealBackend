@@ -13,6 +13,9 @@ from routes.meal_plate_ingredient import router as meal_plate_ingredient_router
 from routes.nutritionix import router as nutritional_router
 from routes.dosis import router as dosis_router
 
+# Configurar supresión de salidas problemáticas al inicio de la aplicación
+from utils.suppress_output import clean_console_output
+
 load_dotenv()  
 
 app = FastAPI()
@@ -39,3 +42,6 @@ app.include_router(meal_plate_router)
 app.include_router(meal_plate_ingredient_router)
 app.include_router(nutritional_router)
 app.include_router(dosis_router)
+
+# Limpiar salida de consola al final de la inicialización
+clean_console_output()

@@ -1,5 +1,6 @@
 import os 
 import io
+import logging
 from dotenv import load_dotenv
 import requests
 from sqlmodel import Session, select
@@ -18,6 +19,8 @@ from resources.dosis_resource import DosisResource
 from utils.json_dict_converter import dict_to_json, json_to_dict
 import time
 
+# Configurar logger específico para este módulo
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -33,7 +36,7 @@ class NutritionixResource:
         self.base_url = os.getenv("NUTRITIONIX_URL")
 
     def post_food_by_natural_language(self, food_name: str, grams: float = 100.00):
-        print("Post para buscar carbohidratos por nombre")
+        logger.debug(f"Consultando Nutritionix para: {food_name}")
         url = f"{self.base_url}"    
         
         formated_query = f"100 grams of {food_name}" 
@@ -48,13 +51,18 @@ class NutritionixResource:
         }
         
         response = requests.post(url, headers=headers, json=payload)
-        print("Respuesta de nutritionix recibida")
-
-        if response.status_code != 200:
+        
+        if response.status_code == 200:
+            logger.debug("Respuesta exitosa de Nutritionix API")
+        elif response.status_code == 404:
+            logger.warning(f"Alimento no encontrado en Nutritionix: {food_name}")
+            raise HTTPException(status_code=404, detail=f"We couldn't match any of your foods")
+        else:
+            logger.error(f"Error en Nutritionix API: {response.status_code} - {response.text}")
             raise Exception(f"Error en la búsqueda: {response.status_code} - {response.text}")
 
         food_data = response.json()
-        print("Respuesta de nutritionix recibida", food_data)
+        logger.debug(f"Datos de Nutritionix obtenidos para: {food_name}")
 
         # Verifica si existen resultados en la respuesta
         if food_data.get("foods") and len(food_data["foods"]) > 0:
@@ -67,7 +75,7 @@ class NutritionixResource:
 
 
     def orquest(self, food_dic, meal_plate: MealPlate = None):  
-        print("Iniciando la orquestación de nutritionix")
+        logger.info(f"Iniciando procesamiento nutricional para {len(food_dic) if isinstance(food_dic, dict) else 'datos'} alimentos")
         name_and_carbs_dic = {}
     
         # Si food_dic es un json, lo convierte a un diccionario
@@ -85,14 +93,14 @@ class NutritionixResource:
                 existing_ingredient = ingredient_resource.get_by_name(normalized_food)
                 
                 # Si el ingrediente ya existe, usamos sus datos directamente
-                print(f"Ingrediente '{normalized_food}' encontrado en la base de datos")
+                logger.debug(f"Ingrediente '{normalized_food}' encontrado en BD")
                 normalized_api_food_name = normalized_food
                 carbs_per_hundred = existing_ingredient.carbsPerHundredGrams
                 ingredientId = existing_ingredient.id
             except HTTPException as e:
                 if e.status_code == 404:
                     # Si no existe, hacemos la petición a la API
-                    print(f"Buscando ingrediente '{normalized_food}' en Nutritionix API")
+                    logger.info(f"Consultando Nutritionix para nuevo ingrediente: '{normalized_food}'")
                     food_data = self.post_food_by_natural_language(normalized_food, grams)
                     normalized_api_food_name = food_data["food_name"].lower()
                     carbs_per_hundred = food_data["carbs"]
@@ -106,21 +114,22 @@ class NutritionixResource:
                     ).first()
                     ingredientId = new_ingredient.id
                     
-                    time.sleep(1)  # Se espera 1 segundo entre cada llamada a la API para evitar el rate limit
+                    time.sleep(1)  # Esperar para evitar rate limit
+                    logger.debug(f"Rate limit: esperando 1 segundo")
                 else:
                     # Si es otro tipo de error, lo propagamos
+                    logger.error(f"Error inesperado al buscar ingrediente '{normalized_food}': {e}")
                     raise e
     
             # Guardamos los datos en el diccionario
             name_and_carbs_dic[normalized_api_food_name] = {
                 "carbs": carbs_per_hundred,
-            }
-    
-            # Se actualiza la tabla MealPlateIngredient para que tenga los gramos y carbohidratos
+            }            # Se actualiza la tabla MealPlateIngredient para que tenga los gramos y carbohidratos
             calculated_carbs = self.update_meal_plate_ingredient(carbs_per_hundred, grams, ingredientId, meal_plate.id)
-    
-            print(f"\n\nAlimento: {normalized_api_food_name}, Carbohidratos: {carbs_per_hundred}, Gramos: {grams}, Total: {calculated_carbs}g\n\n")
-    
+
+            logger.info(f"Procesado: {normalized_api_food_name} - {calculated_carbs}g carbohidratos ({grams}g porción)")
+
+        logger.info("Procesamiento nutricional completado exitosamente")
         return meal_plate
 
 
@@ -135,11 +144,11 @@ class NutritionixResource:
         )
         
         ingredient_resource.create(ingredient_data)
-        print("Ingrediente ", name, "Creado exitosamente")
+        logger.info(f"Ingrediente creado: {name} ({carbs}g carbohidratos/100g)")
         return {"message": "Ingrediente creado exitosamente"}
     
     def add_ingredient_to_meal_plate(self, ingredient_id: int, meal_plate_id: int):
-        print("Agregando ingrediente al MealPlate en Nutritionix")
+        logger.debug(f"Agregando ingrediente {ingredient_id} a MealPlate {meal_plate_id}")
 
         resource = MealPlateIngredientResource(self.session, current_user=self.current_user)
 
@@ -147,12 +156,12 @@ class NutritionixResource:
             # Verifica si el ingrediente ya está asociado al MealPlate
             existing_ingredient = resource.get_one(meal_plate_id, ingredient_id)
             if existing_ingredient:
-                print(f"El ingrediente {ingredient_id} ya está asociado al MealPlate {meal_plate_id}")
+                logger.debug(f"El ingrediente {ingredient_id} ya está asociado al MealPlate {meal_plate_id}")
                 return existing_ingredient
         except HTTPException as e:
             if e.status_code == 404:
                 # Si no existe, lo creamos directamente en la base de datos
-                print(f"Creando nueva relación MealPlateIngredient")
+                logger.debug(f"Creando nueva relación MealPlateIngredient para ingrediente {ingredient_id}")
 
                 # Crear un objeto MealPlateIngredient directamente
                 from models.meal_plate_ingredient import MealPlateIngredient
@@ -173,7 +182,7 @@ class NutritionixResource:
                 raise e
         
     def update_meal_plate_ingredient(self, carbsPerHundredGrams: float, grams: float, ingredient_id: int, meal_plate_id: int):
-        print("Actualizando MealPlateIngredient en Nutritionix")
+        logger.debug(f"Actualizando MealPlateIngredient: {grams}g, ingrediente {ingredient_id}")
 
         resource = MealPlateIngredientResource(self.session, current_user=self.current_user)
 
@@ -195,7 +204,7 @@ class NutritionixResource:
         except HTTPException as e:
             # Si obtenemos un 404, significa que no existe la relación
             if e.status_code == 404:
-                print(f"Creando nueva relación entre MealPlate {meal_plate_id} e Ingredient {ingredient_id}")
+                logger.debug(f"Creando nueva relación MealPlate {meal_plate_id} - Ingredient {ingredient_id}")
 
                 # Creamos la relación utilizando el método que ya tenemos
                 self.add_ingredient_to_meal_plate(ingredient_id, meal_plate_id)
@@ -209,6 +218,7 @@ class NutritionixResource:
                 updated_ingredient = resource.update(meal_plate_id, ingredient_id, data)
             else:
                 # Si es otro tipo de error, lo propagamos
+                logger.error(f"Error inesperado al actualizar MealPlateIngredient: {e}")
                 raise e
 
         return carbs

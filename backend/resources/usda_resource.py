@@ -1,5 +1,6 @@
 import os 
 import io
+import logging
 from dotenv import load_dotenv
 import requests
 from sqlmodel import Session, select
@@ -12,6 +13,8 @@ from models.ingredient import Ingredient
 from models.meal_plate import MealPlate
 from models.food_history import FoodHistory
 
+# Configurar logger específico para este módulo
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -27,14 +30,15 @@ class UsdaResource:
         self.base_url = os.getenv("USDA_URL")
 
     def get_food_by_name(self, food_name: str):
-        print("Get para buscar carbohidratos por nombre")
+        logger.debug(f"Consultando USDA para: {food_name}")
         url = f"{self.base_url}api_key={self.app_key}&query={food_name}&dataType={self.data_type}&pageSize={self.page_size}"
         response = requests.get(url)
         if response.status_code != 200:
+            logger.error(f"Error en USDA API: {response.status_code} - {response.text}")
             raise Exception(f"Error en la búsqueda: {response.status_code} - {response.text}")
     
         food_data = response.json()
-        print("Respuesta de USDA recibida", food_data)
+        logger.debug(f"Respuesta de USDA recibida para: {food_name}")
     
         # Verifica si existen resultados en 'foods'
         if food_data.get("foods") and len(food_data["foods"]) > 0:

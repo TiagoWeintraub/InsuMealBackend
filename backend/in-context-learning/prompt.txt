@@ -97,4 +97,19 @@ Image: A flan with caramel
   "caramel": 35
 }
 
-Begin analysis. The first image will be provided next.
+Image: Large Ham and Cheese Pie
+{
+  "ham": 150,
+  "cheese": 150,
+  "egg": 150,
+  "dough": 250
+}
+
+Image: An Avocado Toast
+{
+  "toast": 40,
+  "avocado": 60,
+  "egg": 50
+}
+
+Begin analysis always taking into account the size of the food detector to define precise typical quantities. The first image will be provided next.

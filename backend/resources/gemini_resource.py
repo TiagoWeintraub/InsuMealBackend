@@ -1,5 +1,8 @@
 import io
 import os
+import sys
+import logging
+from contextlib import redirect_stdout, redirect_stderr
 from PIL import Image, ImageOps
 from PIL.Image import Resampling
 import google.generativeai as genai
@@ -16,7 +19,13 @@ from sqlmodel import select
 from resources.edamam_resource import EdamamResource
 from resources.nutritionix_resource import NutritionixResource
 from models.meal_plate import MealPlate
+import warnings
 
+# Importar configuración para suprimir salidas
+from utils.suppress_output import safe_library_call
+
+# Configurar logger específico para este módulo
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -26,7 +35,9 @@ class GeminiResource:
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
             raise ValueError("GEMINI_API_KEY no está definido en el .env")
-        genai.configure(api_key=api_key)
+        
+        # Configurar de forma segura
+        safe_library_call(genai.configure, api_key=api_key)
         self.model = genai.GenerativeModel("gemini-2.0-flash-lite")
 
     def create_meal_plate(self, imagen: bytes, mime_type: str, food_history_id: int, food_text_dic) -> None:
@@ -54,7 +65,7 @@ class GeminiResource:
                 raise HTTPException(status_code=400, detail="No se ha proporcionado una imagen válida.")
             
             # Dimensiones recibidas
-            print(f"Dimensiones de la imagen recibida: {len(image_data)} bytes")
+            logger.info(f"Imagen recibida: {len(image_data)} bytes")
             
             
             # Reducimos el peso de la imagen 
@@ -71,12 +82,15 @@ class GeminiResource:
                 prompt = f.read()
 
             # Enviar imagen y prompt
-            print("Enviando imagen y prompt a Gemini")
-            response = self.model.generate_content([image, prompt])
-            print("Respuesta de Gemini recibida")
+            logger.info("Enviando imagen a Gemini AI para análisis")
+            
+            # Generar contenido de forma segura
+            response = safe_library_call(self.model.generate_content, [image, prompt])
+            
+            logger.info("Respuesta de Gemini AI recibida exitosamente")
             
             food_text_dic = self.clean_data(response.text)
-            print("La respuesta de Gemini ha sido limpiada")
+            logger.debug("Respuesta de Gemini procesada y limpiada")
             
             if not food_text_dic:
                 raise HTTPException(
@@ -94,14 +108,15 @@ class GeminiResource:
 
             # Al recurso call nutritional_api se le envia el diccionario de alimentos sin el primer elemento clave-valor
             nutritional_api_dic = {k: v for k, v in food_text_dic.items() if k != list(food_text_dic.keys())[0]}
-            print("El diccionario de alimentos que se le envía a nutritional_api es: ", nutritional_api_dic)
+            logger.debug(f"Diccionario enviado a API nutricional: {nutritional_api_dic}")
 
             # Se crea el MealPlate solo si el diccionario de alimentos no está vacío
             if not nutritional_api_dic or len(nutritional_api_dic) == 0:
+                logger.warning("No se encontraron alimentos para procesar")
                 return -1
             meal_plate = self.create_meal_plate(imagen, mime_type, food_history.id, food_text_dic)
             
-            print("MealPlate creado exitosamente:", meal_plate)
+            logger.info(f"MealPlate creado exitosamente con ID: {meal_plate.id}")
 
             self.call_nutritional_api_resource(nutritional_api_dic, meal_plate ,current_user)
             
@@ -110,16 +125,16 @@ class GeminiResource:
             return meal_plate.id
 
         except HTTPException as http_exc:
-            print(f"Error HTTP: {http_exc.detail}")
+            logger.error(f"Error HTTP en análisis de imagen: {http_exc.detail}")
             self.session.rollback()  
             raise http_exc
         except Exception as e:
-            print(f"Error inesperado: {str(e)}")
+            logger.error(f"Error inesperado en análisis de imagen: {str(e)}")
             self.session.rollback()
             raise HTTPException(status_code=500, detail="Error interno del servidor")
 
     def clean_data(self, data: str) -> dict:
-        print("\n\n\nLos datos recibidos de Gemini son: ", data)
+        logger.debug(f"Datos recibidos de Gemini: {data[:100]}...")  # Solo los primeros 100 caracteres
         
         # Intentar múltiples patrones para extraer el diccionario
         patterns = [
@@ -133,7 +148,7 @@ class GeminiResource:
             match = re.search(pattern, data, re.DOTALL)
             if match:
                 dict_str = match.group(1)
-                print(f"Diccionario encontrado con patrón: {pattern}")
+                logger.debug(f"Diccionario encontrado con patrón: {pattern}")
                 break
         
         if dict_str:
@@ -192,7 +207,7 @@ class GeminiResource:
                 
                 food_dict[key] = value
             
-            print("Diccionario de alimentos extraído:", food_dict)
+            logger.debug(f"Diccionario de alimentos extraído: {food_dict}")
             
             # Convertir todos los values a float si son strings numéricos
             for key in food_dict:
@@ -203,7 +218,7 @@ class GeminiResource:
                         pass 
             return food_dict
         else:
-            print("No se encontró el diccionario en el texto.")
+            logger.warning("No se encontró diccionario válido en la respuesta de Gemini")
             return {}
     
     def reduce_image_weight(self, image_data: bytes, target_max_kb=500) -> bytes:
@@ -227,14 +242,12 @@ class GeminiResource:
             compressed_data = output.getvalue()
             final_size_kb = len(compressed_data) / 1024
             if image_data == compressed_data:
-                print("La imagen no ha cambiado de peso y sus dimensiones son las mismas.")
+                logger.debug("La imagen no requirió compresión")
             else:
-                print(f"Peso final: {final_size_kb:.2f} KB con calidad {quality}")
-                print(f"Dimensiones finales: {image.size}")
-            print("Imagen comprimida")
+                logger.info(f"Imagen comprimida: {final_size_kb:.2f} KB (calidad {quality}), dimensiones: {image.size}")
             return compressed_data
         else:
-            print("La imagen es demasiado pequeña para ser comprimida.")
+            logger.debug("La imagen es demasiado pequeña para ser comprimida")
             return image_data
     
 
@@ -245,8 +258,8 @@ class GeminiResource:
     
             self.session.commit()
         
-            print("Se ha llamado a la Api Nutricional")
+            logger.info("Información nutricional procesada exitosamente")
         except Exception as e:
             self.session.rollback()
-            print(f"Error al procesar la información nutricional: {str(e)}")
+            logger.error(f"Error al procesar información nutricional: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Error al procesar la información nutricional: {str(e)}")

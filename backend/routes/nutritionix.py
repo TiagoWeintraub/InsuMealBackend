@@ -8,6 +8,10 @@ import google.generativeai as genai
 import os
 import json
 import re
+from langdetect import detect
+
+# Importar configuración para suprimir salidas
+from utils.suppress_output import clean_console_output, safe_library_call
 
 from database import get_session
 from models.user import User
@@ -22,42 +26,58 @@ class SingleFoodRequest(BaseModel):
     food: str  # Un solo alimento sin peso especificado
 
 
+def detect_language(text: str) -> str:
+    """Detecta el idioma del texto usando langdetect"""
+    try:
+        # Usar función segura para detectar idioma
+        detected_lang = safe_library_call(detect, text)
+        print(f"Idioma detectado para '{text}': {detected_lang}")
+        return detected_lang
+    except Exception as e:
+        print(f"Error detectando idioma para '{text}': {e}")
+        # Si no se puede detectar, asumir que no es inglés para forzar traducción
+        return "unknown"
+
+
 def setup_translation_packages():
     """Configura y descarga los paquetes de traducción necesarios"""
     try:
-        # Actualizar el índice de paquetes disponibles
-        argostranslate.package.update_package_index()
-        
-        # Buscar el paquete de español a inglés
-        available_packages = argostranslate.package.get_available_packages()
-        spanish_to_english_package = None
-        
-        for package in available_packages:
-            if package.from_code == "es" and package.to_code == "en":
-                spanish_to_english_package = package
-                break
-        
-        if spanish_to_english_package is None:
-            print("Advertencia: No se encontró el paquete de traducción español-inglés")
-            return False
-        
-        # Verificar si el paquete ya está instalado
-        installed_packages = argostranslate.package.get_installed_packages()
-        is_installed = any(
-            pkg.from_code == "es" and pkg.to_code == "en" 
-            for pkg in installed_packages
-        )
-        
-        if not is_installed:
-            print("Descargando e instalando paquete de traducción español-inglés...")
-            argostranslate.package.install_from_path(
-                spanish_to_english_package.download()
+        # Usar función segura para toda la configuración de traducción
+        def _setup_packages():
+            # Actualizar el índice de paquetes disponibles
+            argostranslate.package.update_package_index()
+            
+            # Buscar el paquete de español a inglés
+            available_packages = argostranslate.package.get_available_packages()
+            spanish_to_english_package = None
+            
+            for package in available_packages:
+                if package.from_code == "es" and package.to_code == "en":
+                    spanish_to_english_package = package
+                    break
+            
+            if spanish_to_english_package is None:
+                return False, "No se encontró el paquete de traducción español-inglés"
+            
+            # Verificar si el paquete ya está instalado
+            installed_packages = argostranslate.package.get_installed_packages()
+            is_installed = any(
+                pkg.from_code == "es" and pkg.to_code == "en" 
+                for pkg in installed_packages
             )
-            print("Paquete de traducción instalado exitosamente")
-        else:
-            print("Paquete de traducción español-inglés ya está instalado")
+            
+            if not is_installed:
+                # Descargar e instalar el paquete
+                package_path = spanish_to_english_package.download()
+                argostranslate.package.install_from_path(package_path)
+                return True, "Paquete de traducción instalado exitosamente"
+            else:
+                return True, "Paquete de traducción español-inglés ya está instalado"
         
-        return True
+        # Ejecutar la configuración de forma segura
+        success, message = safe_library_call(_setup_packages)
+        print(message)
+        return success
             
     except Exception as e:
         print(f"Error configurando paquetes de traducción: {e}")
@@ -67,8 +87,8 @@ def setup_translation_packages():
 def translate_spanish_to_english(text: str) -> str:
     """Traduce texto de español a inglés usando argostranslate"""
     try:
-        # Traducir de español a inglés
-        translated_text = argostranslate.translate.translate(text, "es", "en")
+        # Usar función segura para traducir
+        translated_text = safe_library_call(argostranslate.translate.translate, text, "es", "en")
         print(f"Traducción: '{text}' -> '{translated_text}'")
         return translated_text.lower()
     except Exception as e:
@@ -91,6 +111,9 @@ def translate_food_dictionary(food_dic: dict) -> dict:
         translated_food_dic[english_key] = grams
         print(f"Alimento traducido: '{spanish_key}' -> '{english_key}' ({grams}g)")
     
+    # Limpiar salida de consola después de la traducción
+    clean_console_output()
+    
     return translated_food_dic
 
 
@@ -99,7 +122,9 @@ def setup_gemini():
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise ValueError("GEMINI_API_KEY no está definido en el .env")
-    genai.configure(api_key=api_key)
+    
+    # Configurar de forma segura
+    safe_library_call(genai.configure, api_key=api_key)
     return genai.GenerativeModel("gemini-2.0-flash-lite")
 
 
@@ -155,7 +180,9 @@ Example 3:
 
 
         print(f"Consultando a Gemini para estimar porciones en plato '{meal_plate_name}'")
-        response = model.generate_content(prompt)
+        
+        # Generar contenido de forma segura
+        response = safe_library_call(model.generate_content, prompt)
         
         # Limpiar y parsear la respuesta
         clean_response = clean_gemini_response(response.text)
@@ -223,9 +250,17 @@ async def process_single_food(
         if not meal_plate:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="MealPlate no encontrado")
         
-        # 1. TRADUCIR el alimento de español a inglés
-        translated_food = translate_spanish_to_english(food_name)
-        print(f"Alimento traducido: '{food_name}' -> '{translated_food}'")
+        # 0. Verificar si food_name está en inglés con langdetect
+        detected_language = detect_language(food_name)
+        
+        if detected_language == "en":
+            # Si está en inglés, usar el nombre original
+            translated_food = food_name.lower()
+            print(f"Alimento ya está en inglés: '{food_name}' -> '{translated_food}'")
+        else:
+            # Si está en cualquier otro idioma, traducir a inglés
+            translated_food = translate_spanish_to_english(food_name)
+            print(f"Alimento traducido de {detected_language} a inglés: '{food_name}' -> '{translated_food}'")
         
         # 2. VERIFICAR si el alimento ya existe en el plato
         ingredient_resource = IngredientResource(session)
@@ -273,6 +308,9 @@ async def process_single_food(
         # Obtener la información completa del meal plate con todos sus ingredientes
         ingredient_resource = IngredientResource(session)
         meal_plate_details = ingredient_resource.read_ingredients_by_meal_plate(meal_plate_id)
+
+        # Limpiar salida de consola antes de retornar
+        clean_console_output()
 
         return {
             "message": "Alimento procesado exitosamente",
@@ -338,6 +376,9 @@ async def process_single_food(
                 )
             
         # Para otros errores, devolver un error más informativo
+        # Limpiar salida de consola antes de lanzar el error
+        clean_console_output()
+        
         raise HTTPException(
             status_code=500, 
             detail={
