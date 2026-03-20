@@ -23,7 +23,6 @@ from auth.dependencies import get_current_user
 from resources.meal_plate_resource import MealPlateResource
 from resources.ingredient_resource import IngredientResource
 from models.meal_plate import MealPlate
-from resources.nutritionix_resource import NutritionixResource
 from resources.dosis_resource import DosisResource
 from schemas.meal_plate_schema import Glycemia
 

@@ -9,6 +9,7 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 from typing import Union
 import re
+import json
 from sqlmodel import Session
 from resources.meal_plate_resource import MealPlateResource
 from models.user import User
@@ -17,7 +18,6 @@ from models.food_history import FoodHistory
 import imghdr
 from sqlmodel import select
 from resources.edamam_resource import EdamamResource
-from resources.nutritionix_resource import NutritionixResource
 from models.meal_plate import MealPlate
 import warnings
 
@@ -29,16 +29,57 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
+
+def _meal_image_generation_config() -> genai.GenerationConfig:
+    """
+    Una sola petición a Gemini: forzar salida JSON válida (sin markdown ni texto extra).
+
+    Formato del JSON (igual que antes):
+      - Rechazo: {"analysis_rejected": true, "reject_reason": "...", "user_message": "..."}
+      - Comida:  {"Pizza": 1, "pizza dough": 350, ...}
+
+    Nota: Un response_schema con anyOf (rechazo vs. claves libres de plato) no convierte bien
+    en el SDK google-generativeai; response_mime_type="application/json" sí garantiza JSON válido.
+    """
+    try:
+        temperature = float(os.getenv("GEMINI_TEMPERATURE", "0.2"))
+    except ValueError:
+        temperature = 0.2
+    return genai.GenerationConfig(
+        response_mime_type="application/json",
+        temperature=temperature,
+    )
+
+
+def _normalize_meal_numeric_values(data: dict) -> dict:
+    """Convierte valores del diccionario de comida a float (gramos / unidades)."""
+    out: dict = {}
+    for key, val in data.items():
+        if isinstance(val, bool):
+            continue
+        if isinstance(val, (int, float)):
+            out[key] = float(val)
+            continue
+        if isinstance(val, str):
+            try:
+                s = val.strip()
+                out[key] = float(s) if "." in s else float(int(s))
+            except ValueError:
+                pass
+    return out
+
+
 class GeminiResource:
     def __init__(self, session: Session):
         self.session = session
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
             raise ValueError("GEMINI_API_KEY no está definido en el .env")
-        
+        model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
+
         # Configurar de forma segura
         safe_library_call(genai.configure, api_key=api_key)
-        self.model = genai.GenerativeModel("gemini-2.0-flash-lite")
+        self.model = genai.GenerativeModel(model_name)
 
     def create_meal_plate(self, imagen: bytes, mime_type: str, food_history_id: int, food_text_dic) -> None:
         meal_plate_resource = MealPlateResource(self.session)
@@ -57,6 +98,97 @@ class GeminiResource:
         )
         
         return response
+
+    @staticmethod
+    def _default_rejection_message(code: str) -> str:
+        messages = {
+            "no_food": "No se detecta un plato de comida en la imagen. Sube una foto de tu comida.",
+            "industrial_snack": "Esta app está pensada para comidas y platos. Los caramelos u snacks industriales empaquetados no se pueden analizar aquí de forma segura para la dosis de insulina.",
+            "not_a_meal": "No se puede estimar un plato con ingredientes reconocibles. Prueba con otra foto más clara.",
+        }
+        return messages.get(code, messages["no_food"])
+
+    def _parse_analysis_rejection(self, text: str) -> dict | None:
+        """
+        Respaldo: extrae rechazo si el texto no era JSON puro (modelos antiguos / markdown).
+        """
+        if not text or "analysis_rejected" not in text:
+            return None
+        cleaned = text.strip()
+        if "```" in cleaned:
+            fence = re.search(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", cleaned)
+            if fence:
+                cleaned = fence.group(1)
+        start = cleaned.find("{")
+        if start == -1:
+            return None
+        depth = 0
+        for i in range(start, len(cleaned)):
+            c = cleaned[i]
+            if c == "{":
+                depth += 1
+            elif c == "}":
+                depth -= 1
+                if depth == 0:
+                    chunk = cleaned[start : i + 1]
+                    try:
+                        obj = json.loads(chunk)
+                    except json.JSONDecodeError:
+                        return None
+                    if obj.get("analysis_rejected") is True:
+                        return obj
+                    return None
+        return None
+
+    def _parse_strict_json_response(self, raw_text: str) -> dict:
+        """
+        Con response_mime_type=application/json, el cuerpo suele ser un único objeto JSON.
+        Si falla, intentamos rechazo embebido y luego el parser legado de diccionario de comida.
+        """
+        text = (raw_text or "").strip()
+        if not text:
+            return {}
+
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError:
+            logger.warning("JSON inválido pese a MIME JSON; probando parsers de respaldo")
+            rejection = self._parse_analysis_rejection(text)
+            if rejection:
+                return rejection
+            return self.clean_data(text)
+
+        if not isinstance(data, dict):
+            return {}
+
+        return data
+
+    def _interpret_analysis_dict(self, data: dict) -> tuple[str, dict]:
+        """
+        Decide si es rechazo o comida. Mantiene el mismo contrato que antes.
+
+        Returns:
+            ("reject", dict con reject_reason / user_message) o ("meal", dict solo plato+ingredientes).
+        """
+        if not data:
+            return (
+                "reject",
+                {
+                    "reject_reason": "no_food",
+                    "user_message": self._default_rejection_message("no_food"),
+                },
+            )
+
+        if data.get("analysis_rejected") is True:
+            return ("reject", data)
+
+        meal = {
+            k: v
+            for k, v in data.items()
+            if k not in ("analysis_rejected", "reject_reason", "user_message")
+        }
+        meal = _normalize_meal_numeric_values(meal)
+        return ("meal", meal)
 
     def analyze_image(self, image_data: bytes, current_user: User) -> Union[str, dict]:
         try:
@@ -84,19 +216,43 @@ class GeminiResource:
             # Enviar imagen y prompt
             logger.info("Enviando imagen a Gemini AI para análisis")
             
-            # Generar contenido de forma segura
-            response = safe_library_call(self.model.generate_content, [image, prompt])
-            
+            # Una sola petición: JSON estricto vía API (ver _meal_image_generation_config)
+            response = safe_library_call(
+                self.model.generate_content,
+                [image, prompt],
+                generation_config=_meal_image_generation_config(),
+            )
+
             logger.info("Respuesta de Gemini AI recibida exitosamente")
-            
-            food_text_dic = self.clean_data(response.text)
-            logger.debug("Respuesta de Gemini procesada y limpiada")
-            
+
+            parsed = self._parse_strict_json_response(response.text or "")
+            kind, payload = self._interpret_analysis_dict(parsed)
+
+            if kind == "reject":
+                code = payload.get("reject_reason", "no_food")
+                if code not in ("no_food", "industrial_snack", "not_a_meal"):
+                    code = "no_food"
+                msg = payload.get("user_message") or self._default_rejection_message(code)
+                logger.info(f"Análisis rechazado por Gemini: {code}")
+                raise HTTPException(
+                    status_code=422,
+                    detail={
+                        "code": code,
+                        "message": msg,
+                    },
+                )
+
+            food_text_dic = payload
+            logger.debug("Respuesta de Gemini procesada (JSON)")
+
             if not food_text_dic:
                 raise HTTPException(
-                    status_code=422, 
-                    detail="No se pudo extraer información de los alimentos de la imagen. Por favor, intenta con otra imagen más clara."
-            )
+                    status_code=422,
+                    detail={
+                        "code": "parse_error",
+                        "message": "No se pudo extraer información de los alimentos de la imagen. Por favor, intenta con otra imagen más clara.",
+                    },
+                )
 
             # Se busca el FoodHistory del usuario
             food_history = self.session.exec(
@@ -118,8 +274,12 @@ class GeminiResource:
             
             logger.info(f"MealPlate creado exitosamente con ID: {meal_plate.id}")
 
-            self.call_nutritional_api_resource(nutritional_api_dic, meal_plate ,current_user)
-            
+            self.call_nutritional_api_resource(nutritional_api_dic, meal_plate, current_user)
+
+            # Recalcular totalCarbs del plato a partir de los ingredientes
+            meal_plate_resource = MealPlateResource(self.session)
+            meal_plate_resource.calculate_total_carbs(meal_plate.id)
+
             # Asegurar que todo se guarda correctamente
             self.session.commit()
             return meal_plate.id
@@ -253,12 +413,28 @@ class GeminiResource:
 
     def call_nutritional_api_resource(self, food_dic, meal_plate: MealPlate ,current_user: User) -> None:
         try:
-            nutritionix_resource = NutritionixResource(self.session, current_user)
-            nutritionix_resource.orquest(food_dic, meal_plate)
-    
+            edamam_resource = EdamamResource(self.session, current_user)
+            edamam_resource.orquest(food_dic, meal_plate)
+
             self.session.commit()
-        
+
             logger.info("Información nutricional procesada exitosamente")
+        except HTTPException as e:
+            self.session.rollback()
+            # Edamam: alimento inexistente (p. ej. Gemini inventó "laptop" en una foto que no es comida)
+            if e.status_code == 404:
+                logger.warning(f"Ingrediente no resuelto en API nutricional: {e.detail}")
+                raise HTTPException(
+                    status_code=422,
+                    detail={
+                        "code": "ingredient_not_found",
+                        "message": (
+                            "No se encontró información nutricional para uno de los elementos detectados. "
+                            "Si la imagen no es un plato de comida, sube una foto del plato."
+                        ),
+                    },
+                ) from e
+            raise
         except Exception as e:
             self.session.rollback()
             logger.error(f"Error al procesar información nutricional: {str(e)}")

@@ -5,20 +5,19 @@ PROBLEMA IDENTIFICADO:
 1. Uso excesivo de print() en lugar de logging profesional
 2. Caracteres extraños "cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxsssscxx..." en logs
 3. Logs de SQLAlchemy innecesarios (consultas SQL detalladas)
-4. Salida de debug de librerías ML (argostranslate, google.generativeai, etc.)
+4. Salida de debug de librerías ML (google.generativeai, etc.)
 
 SOLUCIÓN IMPLEMENTADA:
 
 ### 1. CONFIGURACIÓN CENTRAL DE LOGGING
 - ✅ `utils/suppress_output.py`: Configuración centralizada
-- ✅ Supresión de librerías problemáticas (argostranslate, genai, langdetect, etc.)
+- ✅ Supresión de librerías problemáticas (genai, gRPC, etc.)
 - ✅ Configuración profesional de logging con formato y niveles
 - ✅ Variable de entorno `APP_LOG_LEVEL` para control granular
 
 ### 2. ARCHIVOS CONVERTIDOS A LOGGING PROFESIONAL
 - ✅ `resources/gemini_resource.py` - COMPLETADO
-- ✅ `resources/nutritionix_resource.py` - COMPLETADO  
-- 🟡 `resources/usda_resource.py` - PARCIAL
+- 🟡 `resources/usda_resource.py` - PARCIAL (si aplica en tu rama)
 - ❌ Resto de archivos en `resources/` - PENDIENTE
 
 ### 3. NIVELES DE LOGGING UTILIZADOS
@@ -44,9 +43,7 @@ Niveles disponibles: DEBUG, INFO, WARNING, ERROR, CRITICAL
 ### 5. ARCHIVOS MODIFICADOS COMPLETAMENTE
 - ✅ `backend/utils/suppress_output.py`
 - ✅ `backend/resources/gemini_resource.py`
-- ✅ `backend/resources/nutritionix_resource.py`
 - ✅ `backend/database.py`
-- ✅ `backend/routes/nutritionix.py`
 - ✅ `backend/__init__.py`
 
 ### 6. TAREAS PENDIENTES
@@ -85,17 +82,14 @@ print("\\n\\n\\n") → ELIMINAR (formato innecesario)
 **❌ ANTES:**
 ```
 Post para buscar carbohidratos por nombre
-Respuesta de nutritionix recibida
 cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxsssscxx...
 Ingrediente pollo Creado exitosamente
 ```
 
 **✅ DESPUÉS:**
 ```
-2025-07-06 15:30:15 - backend.resources.nutritionix_resource - INFO - Iniciando procesamiento nutricional para 3 alimentos
-2025-07-06 15:30:16 - backend.resources.nutritionix_resource - INFO - Consultando Nutritionix para nuevo ingrediente: 'pollo'
-2025-07-06 15:30:17 - backend.resources.nutritionix_resource - INFO - Ingrediente creado: pollo (0g carbohidratos/100g)
-2025-07-06 15:30:17 - backend.resources.nutritionix_resource - INFO - Procesamiento nutricional completado exitosamente
+2025-07-06 15:30:15 - backend.resources.edamam_resource - INFO - …
+2025-07-06 15:30:16 - backend.resources.gemini_resource - INFO - …
 ```
 
 ### 9. PARA DEBUGGING
