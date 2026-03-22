@@ -1,17 +1,29 @@
 from typing import TYPE_CHECKING, List, Optional
 from sqlmodel import SQLModel, Field, Relationship
+from sqlalchemy import Column, ForeignKey, Integer
 from werkzeug.security import generate_password_hash, check_password_hash
 
 if TYPE_CHECKING:
     from .clinical_data import ClinicalData
     from .food_history import FoodHistory
+    from .role import Role
+    from .usage import Usage
 
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
     lastName: str
-    email: str = Field(unique=True, index=True) 
-    password: str 
+    email: str = Field(unique=True, index=True)
+    password: str
+    role_id: int = Field(
+        sa_column=Column(
+            Integer,
+            ForeignKey("role.id"),
+            nullable=False,
+        )
+    )
+
+    role: Optional["Role"] = Relationship(back_populates="users")
 
     # Relación 1-a-1 con ClinicalData con cascade delete
     clinical_data: Optional["ClinicalData"] = Relationship(
@@ -28,6 +40,11 @@ class User(SQLModel, table=True):
             "uselist": False,
             "cascade": "all, delete"
         }
+    )
+    # Registro de uso de tokens de Gemini (1 usuario -> muchas requests)
+    usages: List["Usage"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={"cascade": "all, delete"}
     )
     @property
     def plain_password(self):

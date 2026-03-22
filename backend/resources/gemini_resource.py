@@ -2,6 +2,7 @@ import io
 import os
 import sys
 import logging
+from datetime import datetime, timezone
 from contextlib import redirect_stdout, redirect_stderr
 from PIL import Image, ImageOps
 from PIL.Image import Resampling
@@ -15,6 +16,7 @@ from resources.meal_plate_resource import MealPlateResource
 from models.user import User
 from fastapi import HTTPException
 from models.food_history import FoodHistory
+from models.usage import Usage
 import imghdr
 from sqlmodel import select
 from resources.edamam_resource import EdamamResource
@@ -76,6 +78,8 @@ class GeminiResource:
         if not api_key:
             raise ValueError("GEMINI_API_KEY no está definido en el .env")
         model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
+        self.provider = "google"
+        self.model_name = model_name
 
         # Configurar de forma segura
         safe_library_call(genai.configure, api_key=api_key)
@@ -222,6 +226,7 @@ class GeminiResource:
                 [image, prompt],
                 generation_config=_meal_image_generation_config(),
             )
+            self._register_usage(current_user.id, response)
 
             logger.info("Respuesta de Gemini AI recibida exitosamente")
 
@@ -439,3 +444,21 @@ class GeminiResource:
             self.session.rollback()
             logger.error(f"Error al procesar información nutricional: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Error al procesar la información nutricional: {str(e)}")
+
+    def _register_usage(self, user_id: int, response) -> None:
+        usage = getattr(response, "usage_metadata", None)
+        prompt_tokens = int(getattr(usage, "prompt_token_count", 0) or 0)
+        completion_tokens = int(getattr(usage, "candidates_token_count", 0) or 0)
+        total_tokens = int(getattr(usage, "total_token_count", 0) or 0)
+
+        usage_record = Usage(
+            user_id=user_id,
+            provider=self.provider,
+            model_name=self.model_name,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=total_tokens,
+            created_at=datetime.now(timezone.utc),
+        )
+        self.session.add(usage_record)
+        self.session.commit()

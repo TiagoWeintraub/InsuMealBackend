@@ -11,3 +11,7 @@ include/
 
 # Ignora el archivo de configuración de entorno virtual
 .env
+
+# Manifiestos k8s viven en la raíz del repo → ignorados en /.gitignore (k8s/, k8s_example/)
+k8s_example/
+k8s/
