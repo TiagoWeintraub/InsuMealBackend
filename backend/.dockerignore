@@ -1,0 +1,17 @@
+# Entorno local y secretos
+.venv
+.env
+pyvenv.cfg
+
+# Git y sistema
+.git
+.gitignore
+.DS_Store
+
+# Caché Python
+__pycache__
+*.py[cod]
+*$py.class
+.pytest_cache
+.mypy_cache
+.ruff_cache
