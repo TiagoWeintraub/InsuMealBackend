@@ -1,6 +1,7 @@
 from sqlmodel import Session, select
 from fastapi import HTTPException, status
-from sqlalchemy import func
+from sqlalchemy import func, or_
+import math
 from models.user import User
 from models.role import Role
 from models.usage import Usage
@@ -162,6 +163,13 @@ class UserResource:
     def get_user_usage_summary(user_id: int, session: Session):
         UserResource.get_user_by_id(user_id, session)
 
+        total_requests = int(
+            session.exec(
+                select(func.count(Usage.id)).where(Usage.user_id == user_id)
+            ).one()
+            or 0
+        )
+
         rows = session.exec(
             select(
                 Usage.provider,
@@ -176,7 +184,6 @@ class UserResource:
         ).all()
 
         breakdown = []
-        total_requests = 0
         total_prompt = 0
         total_completion = 0
         total_tokens = 0
@@ -191,7 +198,6 @@ class UserResource:
                 "total_tokens": int(total or 0),
             }
             breakdown.append(item)
-            total_requests += item["requests"]
             total_prompt += item["prompt_tokens"]
             total_completion += item["completion_tokens"]
             total_tokens += item["total_tokens"]
@@ -203,6 +209,67 @@ class UserResource:
             "completion_tokens": total_completion,
             "total_tokens": total_tokens,
             "breakdown": breakdown,
+        }
+
+    @staticmethod
+    def get_users_count(session: Session) -> int:
+        return int(session.exec(select(func.count(User.id))).one() or 0)
+
+    @staticmethod
+    def get_users_paginated(
+        session: Session,
+        page: int = 1,
+        page_size: int = 10,
+        search: str | None = None,
+    ):
+        query = select(User)
+        normalized_search = (search or "").strip()
+
+        if normalized_search:
+            pattern = f"%{normalized_search}%"
+            query = query.where(
+                or_(
+                    User.name.ilike(pattern),
+                    User.lastName.ilike(pattern),
+                    User.email.ilike(pattern),
+                )
+            )
+
+        total_count = int(session.exec(select(func.count()).select_from(query.subquery())).one() or 0)
+        offset = (page - 1) * page_size
+
+        users = session.exec(
+            query.order_by(User.id.asc()).offset(offset).limit(page_size)
+        ).all()
+
+        role_ids = {u.role_id for u in users}
+        roles = []
+        if role_ids:
+            roles = session.exec(select(Role).where(Role.id.in_(role_ids))).all()
+        role_map = {r.id: r.name for r in roles}
+
+        items = [
+            {
+                "id": u.id,
+                "name": u.name,
+                "lastName": u.lastName,
+                "email": u.email,
+                "role": role_map.get(u.role_id, "user"),
+            }
+            for u in users
+        ]
+
+        total_pages = math.ceil(total_count / page_size) if total_count > 0 else 1
+        return {
+            "items": items,
+            "pagination": {
+                "page": page,
+                "page_size": page_size,
+                "total_items": total_count,
+                "total_pages": total_pages,
+                "has_next": page < total_pages,
+                "has_previous": page > 1,
+            },
         }
 
     @staticmethod

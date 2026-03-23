@@ -1,0 +1,15 @@
+# Dependencias/cache local
+node_modules
+npm-debug.log*
+.npm
+
+# Variables locales
+.env
+
+# Git y sistema
+.git
+.gitignore
+.DS_Store
+
+# Build local
+dist
