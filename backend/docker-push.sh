@@ -6,6 +6,7 @@
 # Variables de entorno:
 #   DOCKERHUB_USER  (obligatorio) tu usuario de Docker Hub
 #   IMAGE_NAME      (opcional) nombre del repositorio en Hub; por defecto: insumeal-backend
+#   PLATFORM        (opcional) por defecto: linux/amd64
 #
 # Uso:
 #   export DOCKERHUB_USER=tu_usuario
@@ -18,6 +19,7 @@ set -euo pipefail
 TAG="${1:-latest}"
 DOCKERHUB_USER="${DOCKERHUB_USER:-}"
 IMAGE_NAME="${IMAGE_NAME:-insumeal-backend}"
+PLATFORM="${PLATFORM:-linux/amd64}"
 
 if [[ -z "$DOCKERHUB_USER" ]]; then
   echo "Error: definí DOCKERHUB_USER con tu usuario de Docker Hub." >&2
@@ -31,11 +33,12 @@ cd "$ROOT_DIR"
 
 FULL_IMAGE="${DOCKERHUB_USER}/${IMAGE_NAME}:${TAG}"
 
-echo "Building ${FULL_IMAGE} ..."
-docker build -t "${FULL_IMAGE}" .
-
-echo "Pushing ${FULL_IMAGE} ..."
-docker push "${FULL_IMAGE}"
+echo "Building and pushing ${FULL_IMAGE} for ${PLATFORM} ..."
+docker buildx build \
+  --platform "${PLATFORM}" \
+  -t "${FULL_IMAGE}" \
+  --push \
+  .
 
 echo "Listo: ${FULL_IMAGE}"
 

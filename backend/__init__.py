@@ -1,4 +1,6 @@
+import os
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from routes.gemini import router as gemini_router
 from dotenv import load_dotenv
 from database import init_db, inspector
@@ -19,6 +21,25 @@ from utils.suppress_output import clean_console_output
 load_dotenv()  
 
 app = FastAPI()
+
+# CORS para frontend admin (Vite/React u otros hosts configurados)
+# ACA PONER EL INGRESS del frontend en producción.
+# Ejemplo: si el host es weintraub-insumeal-dev.my.kube.um.edu.ar
+# definir CORS_ORIGINS="https://weintraub-insumeal-dev.my.kube.um.edu.ar"
+# (y opcionalmente mantener localhost para desarrollo local).
+cors_origins_raw = os.getenv(
+    "CORS_ORIGINS",
+    "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000",
+)
+cors_origins = [origin.strip() for origin in cors_origins_raw.split(",") if origin.strip()]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/")
 def read_root():

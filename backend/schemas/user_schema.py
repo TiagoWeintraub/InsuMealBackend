@@ -75,3 +75,21 @@ class UserUsageSummary(BaseModel):
     completion_tokens: int
     total_tokens: int
     breakdown: list[UsageBreakdownItem]
+
+
+class AdminUsersPagination(BaseModel):
+    page: int
+    page_size: int
+    total_items: int
+    total_pages: int
+    has_next: bool
+    has_previous: bool
+
+
+class AdminUsersPaginatedResponse(BaseModel):
+    items: list[AdminUserRead]
+    pagination: AdminUsersPagination
+
+
+class UserCountResponse(BaseModel):
+    total_users: int
