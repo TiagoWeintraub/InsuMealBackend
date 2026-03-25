@@ -1,0 +1,3 @@
+# Kubernetes en la raíz del repo (no cubiertos por backend/.gitignore)
+/k8s/
+/k8s_example/

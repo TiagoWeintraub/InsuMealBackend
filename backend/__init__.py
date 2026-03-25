@@ -13,6 +13,7 @@ from routes.meal_plate import router as meal_plate_router
 from routes.auth import router as auth_router
 from routes.meal_plate_ingredient import router as meal_plate_ingredient_router
 from routes.dosis import router as dosis_router
+from routes.nutrition import router as nutrition_router
 from routes.admin import router as admin_router
 
 # Configurar supresión de salidas problemáticas al inicio de la aplicación
@@ -62,6 +63,7 @@ app.include_router(ingredient_router)
 app.include_router(meal_plate_router)
 app.include_router(meal_plate_ingredient_router)
 app.include_router(dosis_router)
+app.include_router(nutrition_router)
 app.include_router(admin_router)
 
 # Limpiar salida de consola al final de la inicialización

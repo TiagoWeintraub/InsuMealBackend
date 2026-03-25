@@ -2,7 +2,7 @@ import io
 import os
 import sys
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 from contextlib import redirect_stdout, redirect_stderr
 from PIL import Image, ImageOps
 from PIL.Image import Resampling
@@ -20,6 +20,7 @@ from models.usage import Usage
 import imghdr
 from sqlmodel import select
 from resources.edamam_resource import EdamamResource
+from resources.usda_resource import UsdaResource
 from models.meal_plate import MealPlate
 import warnings
 
@@ -71,19 +72,117 @@ def _normalize_meal_numeric_values(data: dict) -> dict:
     return out
 
 
+def _extract_retry_seconds_from_error(raw_error: str) -> int | None:
+    match = re.search(r"Please retry in\s+([0-9]+(?:\.[0-9]+)?)s", raw_error or "", re.IGNORECASE)
+    if not match:
+        return None
+    try:
+        return int(float(match.group(1)))
+    except ValueError:
+        return None
+
+
+def _is_rate_limited_error(raw_error: str) -> bool:
+    text = (raw_error or "").lower()
+    return (
+        "quota exceeded" in text
+        or "resourceexhausted" in text
+        or "rate-limit" in text
+        or "rate limit" in text
+        or "status 429" in text
+        or " 429 " in text
+    )
+
+
 class GeminiResource:
+    MODEL_FALLBACK_ORDER = [
+        "gemini-2.5-flash-lite",
+        "gemini-2.5-flash",
+        "gemini-3-flash-preview",
+        "gemini-3.1-flash-lite-preview",
+    ]
+    _active_model_index = 0
+    _active_model_day_utc: date | None = None
+
     def __init__(self, session: Session):
         self.session = session
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
             raise ValueError("GEMINI_API_KEY no está definido en el .env")
-        model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
         self.provider = "google"
-        self.model_name = model_name
 
         # Configurar de forma segura
         safe_library_call(genai.configure, api_key=api_key)
-        self.model = genai.GenerativeModel(model_name)
+        self._reset_daily_model_if_needed()
+        self.model_name = self._get_active_model_name()
+        self.model = genai.GenerativeModel(self.model_name)
+
+    @classmethod
+    def _reset_daily_model_if_needed(cls) -> None:
+        today_utc = datetime.now(timezone.utc).date()
+        if cls._active_model_day_utc != today_utc:
+            cls._active_model_day_utc = today_utc
+            cls._active_model_index = 0
+
+    @classmethod
+    def _get_active_model_name(cls) -> str:
+        idx = max(0, min(cls._active_model_index, len(cls.MODEL_FALLBACK_ORDER) - 1))
+        return cls.MODEL_FALLBACK_ORDER[idx]
+
+    @classmethod
+    def _activate_model_by_name(cls, model_name: str) -> None:
+        if model_name in cls.MODEL_FALLBACK_ORDER:
+            cls._active_model_index = cls.MODEL_FALLBACK_ORDER.index(model_name)
+        else:
+            cls._active_model_index = 0
+        cls._active_model_day_utc = datetime.now(timezone.utc).date()
+
+    def _generate_content_with_fallback(self, image, prompt: str, user_id: int):
+        self._reset_daily_model_if_needed()
+        start_idx = max(0, min(self._active_model_index, len(self.MODEL_FALLBACK_ORDER) - 1))
+        attempted_models: list[str] = []
+        last_retry_seconds: int | None = None
+
+        for model_name in self.MODEL_FALLBACK_ORDER[start_idx:]:
+            attempted_models.append(model_name)
+            try:
+                logger.info(f"Intentando análisis con modelo Gemini: {model_name}")
+                model = genai.GenerativeModel(model_name)
+                response = safe_library_call(
+                    model.generate_content,
+                    [image, prompt],
+                    generation_config=_meal_image_generation_config(),
+                )
+                self.model_name = model_name
+                self.model = model
+                self._activate_model_by_name(model_name)
+                self._register_usage(user_id, response)
+                if len(attempted_models) > 1:
+                    logger.warning(
+                        f"Fallback de Gemini aplicado con éxito. Modelos intentados: {attempted_models}"
+                    )
+                return response
+            except Exception as exc:
+                raw_error = str(exc)
+                if not _is_rate_limited_error(raw_error):
+                    raise
+                last_retry_seconds = _extract_retry_seconds_from_error(raw_error)
+                logger.warning(
+                    f"Modelo Gemini rate-limited ({model_name}). Probando siguiente modelo."
+                )
+                continue
+
+        detail = {
+            "code": "gemini_quota_exceeded",
+            "message": (
+                "429 Too Many Requests: Gemini Quota Exceeded. "
+                "Se agotó la cuota en todos los modelos de fallback disponibles."
+            ),
+            "models_attempted": attempted_models,
+        }
+        if last_retry_seconds is not None:
+            detail["retry_after_seconds"] = last_retry_seconds
+        raise HTTPException(status_code=429, detail=detail)
 
     def create_meal_plate(self, imagen: bytes, mime_type: str, food_history_id: int, food_text_dic) -> None:
         meal_plate_resource = MealPlateResource(self.session)
@@ -220,13 +319,8 @@ class GeminiResource:
             # Enviar imagen y prompt
             logger.info("Enviando imagen a Gemini AI para análisis")
             
-            # Una sola petición: JSON estricto vía API (ver _meal_image_generation_config)
-            response = safe_library_call(
-                self.model.generate_content,
-                [image, prompt],
-                generation_config=_meal_image_generation_config(),
-            )
-            self._register_usage(current_user.id, response)
+            # Intento con fallback automático de modelos frente a 429.
+            response = self._generate_content_with_fallback(image, prompt, current_user.id)
 
             logger.info("Respuesta de Gemini AI recibida exitosamente")
 
@@ -294,7 +388,23 @@ class GeminiResource:
             self.session.rollback()  
             raise http_exc
         except Exception as e:
-            logger.error(f"Error inesperado en análisis de imagen: {str(e)}")
+            raw_error = str(e)
+            if _is_rate_limited_error(raw_error):
+                retry_seconds = _extract_retry_seconds_from_error(raw_error)
+                logger.warning(f"Rate limit de Gemini detectado: {raw_error}")
+                self.session.rollback()
+                detail = {
+                    "code": "gemini_quota_exceeded",
+                    "message": (
+                        "429 Too Many Requests: Gemini Quota Exceeded. "
+                        "No se pudo completar la solicitud por límite de cuota."
+                    ),
+                }
+                if retry_seconds is not None:
+                    detail["retry_after_seconds"] = retry_seconds
+                raise HTTPException(status_code=429, detail=detail)
+
+            logger.error(f"Error inesperado en análisis de imagen: {raw_error}")
             self.session.rollback()
             raise HTTPException(status_code=500, detail="Error interno del servidor")
 
@@ -418,14 +528,29 @@ class GeminiResource:
 
     def call_nutritional_api_resource(self, food_dic, meal_plate: MealPlate ,current_user: User) -> None:
         try:
-            edamam_resource = EdamamResource(self.session, current_user)
-            edamam_resource.orquest(food_dic, meal_plate)
+            nutrition_provider = (os.getenv("NUTRITION_PROVIDER", "usda") or "usda").lower().strip()
+            if nutrition_provider == "usda":
+                nutrition_resource = UsdaResource(self.session, current_user)
+            else:
+                nutrition_resource = EdamamResource(self.session, current_user)
+            nutrition_resource.orquest(food_dic, meal_plate)
 
             self.session.commit()
 
             logger.info("Información nutricional procesada exitosamente")
         except HTTPException as e:
             self.session.rollback()
+            if e.status_code == 429:
+                raise HTTPException(
+                    status_code=429,
+                    detail={
+                        "code": "nutrition_rate_limited",
+                        "message": (
+                            "El servicio nutricional alcanzó su límite de peticiones temporalmente. "
+                            "Intenta nuevamente en unos segundos."
+                        ),
+                    },
+                ) from e
             # Edamam: alimento inexistente (p. ej. Gemini inventó "laptop" en una foto que no es comida)
             if e.status_code == 404:
                 logger.warning(f"Ingrediente no resuelto en API nutricional: {e.detail}")
