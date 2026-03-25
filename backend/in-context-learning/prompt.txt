@@ -131,7 +131,7 @@ Image: An Avocado Toast
 
 Before any food analysis, decide if the image is suitable. If ANY of the following applies, you MUST respond with **ONLY** this JSON object shape (same rule: one JSON object, nothing else):
 
-1. **no_food** — No visible food, empty plate, only drinks without food, pets, people, landscapes, **office objects (computer, monitor, keyboard, phone, desk without a meal)**, documents, or image too unclear to identify food. **Never** label electronics or furniture as ingredients.
+1. **no_food** — No visible food, empty plate, only drinks without food, pets, people, landscapes, **office objects (computer, monitor, keyboard, phone, desk without a meal)**, documents, or image too unclear to identify food. **Never** label electronics, humans, body parts, furniture, or room objects as ingredients.
 2. **industrial_snack** — The main subject is **only** industrial ultra-processed confectionery or packaged snacks where a **meal plate** cannot be analyzed: loose or wrapped candies, lollipops, gummy bears, chewing gum packs, only chocolate bars or candy bags as the whole frame. *(A normal dessert on a plate — flan, cake slice, ice cream bowl — is **accepted**.)*
 3. **not_a_meal** — Food exists but it is not something you can break into ingredients with grams (e.g. unidentifiable mush, or only a factory logo on packaging).
 
@@ -139,5 +139,9 @@ Before any food analysis, decide if the image is suitable. If ANY of the followi
 {"analysis_rejected": true, "reject_reason": "no_food" | "industrial_snack" | "not_a_meal", "user_message": "<short message in Spanish for the end user explaining why>"}
 
 **If the image shows a real meal or dish** (breakfast, lunch, pizza, sandwich, fruit plate, home-cooked plate, restaurant plate, etc.), **do not** include `analysis_rejected`, `reject_reason`, or `user_message`. Return **only** the usual food dictionary (string keys, numeric gram/count values) as specified above.
+
+**Critical safety rule (must obey):**
+- If the main subject is a non-food object (TV, monitor, laptop, keyboard, phone, person, hands, furniture, etc.), you MUST return rejection JSON with `reject_reason: "no_food"`.
+- Never output a food dictionary for non-food scenes.
 
 Begin analysis. The first image will be provided next. 

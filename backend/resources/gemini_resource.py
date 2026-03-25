@@ -94,6 +94,76 @@ def _is_rate_limited_error(raw_error: str) -> bool:
     )
 
 
+def _normalize_text_for_checks(value: str) -> str:
+    return re.sub(r"\s+", " ", (value or "").strip().lower())
+
+
+NON_FOOD_TOKENS = {
+    "tv",
+    "television",
+    "monitor",
+    "screen",
+    "display",
+    "laptop",
+    "computer",
+    "pc",
+    "keyboard",
+    "mouse",
+    "phone",
+    "smartphone",
+    "tablet",
+    "remote",
+    "controller",
+    "desk",
+    "chair",
+    "person",
+    "human",
+    "man",
+    "woman",
+    "people",
+    "face",
+    "hand",
+    "body",
+    "cable",
+    "sofa",
+    "room",
+    "window",
+    "book",
+    "paper",
+}
+
+FOOD_HINT_TOKENS = {
+    "pizza",
+    "burger",
+    "hamburger",
+    "bread",
+    "bun",
+    "cheese",
+    "beef",
+    "chicken",
+    "fish",
+    "rice",
+    "pasta",
+    "spaghetti",
+    "tomato",
+    "lettuce",
+    "onion",
+    "potato",
+    "fries",
+    "salad",
+    "egg",
+    "ham",
+    "avocado",
+    "sauce",
+    "cookie",
+    "cake",
+    "flan",
+    "empanada",
+    "food",
+    "meal",
+}
+
+
 class GeminiResource:
     MODEL_FALLBACK_ORDER = [
         "gemini-2.5-flash-lite",
@@ -291,7 +361,64 @@ class GeminiResource:
             if k not in ("analysis_rejected", "reject_reason", "user_message")
         }
         meal = _normalize_meal_numeric_values(meal)
+
+        validation_reject = self._validate_non_food_payload(meal)
+        if validation_reject is not None:
+            return ("reject", validation_reject)
+
         return ("meal", meal)
+
+    def _validate_non_food_payload(self, meal: dict) -> dict | None:
+        if not meal:
+            return None
+
+        keys = [k for k in meal.keys() if isinstance(k, str)]
+        if not keys:
+            return {
+                "reject_reason": "no_food",
+                "user_message": self._default_rejection_message("no_food"),
+            }
+
+        non_food_hits = 0
+        food_hits = 0
+        for key in keys:
+            normalized = _normalize_text_for_checks(key)
+            tokens = set(re.findall(r"[a-z0-9]+", normalized))
+            if tokens.intersection(NON_FOOD_TOKENS):
+                non_food_hits += 1
+            if tokens.intersection(FOOD_HINT_TOKENS):
+                food_hits += 1
+
+        values = [float(v) for v in meal.values() if isinstance(v, (int, float))]
+        has_positive_amount = any(v > 0 for v in values)
+
+        if not has_positive_amount:
+            return {
+                "reject_reason": "not_a_meal",
+                "user_message": self._default_rejection_message("not_a_meal"),
+            }
+
+        # Si todo lo detectado parece objeto/persona y no hay pistas de comida -> reject estricto.
+        if non_food_hits > 0 and food_hits == 0:
+            logger.warning(
+                f"Payload bloqueado por guard de no-food. keys={keys}, non_food_hits={non_food_hits}"
+            )
+            return {
+                "reject_reason": "no_food",
+                "user_message": self._default_rejection_message("no_food"),
+            }
+
+        # Si la mayoría de claves son no-food, también rechaza.
+        if non_food_hits >= max(2, len(keys)):
+            logger.warning(
+                f"Payload bloqueado por mayoría no-food. keys={keys}, non_food_hits={non_food_hits}, food_hits={food_hits}"
+            )
+            return {
+                "reject_reason": "no_food",
+                "user_message": self._default_rejection_message("no_food"),
+            }
+
+        return None
 
     def analyze_image(self, image_data: bytes, current_user: User) -> Union[str, dict]:
         try:
