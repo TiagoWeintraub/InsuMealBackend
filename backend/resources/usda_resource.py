@@ -2,10 +2,8 @@ import os
 import logging
 import re
 import unicodedata
-import json
 from dotenv import load_dotenv
 import requests
-import google.generativeai as genai
 from sqlmodel import Session, select
 from fastapi import HTTPException
 from resources.ingredient_resource import IngredientResource
@@ -17,7 +15,6 @@ from models.meal_plate import MealPlate
 from resources.meal_plate_ingredient_resource import MealPlateIngredientResource
 from schemas.meal_plate_ingredient_schema import MealPlateIngredientUpdate
 from models.meal_plate_ingredient import MealPlateIngredient
-from utils.suppress_output import safe_library_call
 
 # Configurar logger específico para este módulo
 logger = logging.getLogger(__name__)
@@ -40,6 +37,7 @@ SPANISH_TO_ENGLISH_FOOD_MAP = {
     "pan": "bread",
     "arroz": "rice",
     "galleta": "cookie",
+    "mayonesa": "mayonnaise",
 }
 
 WORD_TO_ENGLISH_MAP = {
@@ -54,6 +52,7 @@ WORD_TO_ENGLISH_MAP = {
     "pan": "bread",
     "arroz": "rice",
     "galleta": "cookie",
+    "mayonesa": "mayonnaise",
 }
 
 
@@ -144,12 +143,17 @@ class UsdaResource:
             score -= max(0, len(desc_tokens) - len(query_tokens)) * 2.5
             score -= sum(1 for token in desc_tokens if token in noisy_tokens) * 10.0
 
-            if not item.get("brandOwner"):
-                score += 5.0
+            brand_owner = str(item.get("brandOwner", "") or "").strip()
+            if not brand_owner:
+                score += 22.0
+            else:
+                score -= 18.0
 
             data_type = str(item.get("dataType", "")).lower()
-            if any(x in data_type for x in ("foundation", "survey", "sr legacy")):
-                score += 4.0
+            if "branded" in data_type:
+                score -= 25.0
+            if any(x in data_type for x in ("foundation", "survey", "sr legacy", "legacy")):
+                score += 10.0
 
             return (score, description)
 
@@ -171,12 +175,13 @@ class UsdaResource:
     def _build_query_candidates(self, food_name: str) -> list[str]:
         normalized = self._normalize_food_name(food_name)
         candidates: list[str] = []
-        if normalized:
-            candidates.append(normalized)
 
         mapped = SPANISH_TO_ENGLISH_FOOD_MAP.get(normalized)
         if mapped and mapped not in candidates:
             candidates.append(mapped)
+
+        if normalized and normalized not in candidates:
+            candidates.append(normalized)
 
         translated_tokens = [WORD_TO_ENGLISH_MAP.get(token, token) for token in normalized.split()]
         token_based = self._normalize_food_name(" ".join(translated_tokens))
@@ -200,25 +205,10 @@ class UsdaResource:
         return candidates or [food_name]
 
     @staticmethod
-    def _extract_first_json_object(text: str) -> dict | None:
-        raw = (text or "").strip()
-        if not raw:
-            return None
-        try:
-            parsed = json.loads(raw)
-            if isinstance(parsed, dict):
-                return parsed
-        except json.JSONDecodeError:
-            pass
-
-        match = re.search(r"\{[\s\S]*\}", raw)
-        if not match:
-            return None
-        try:
-            parsed = json.loads(match.group(0))
-            return parsed if isinstance(parsed, dict) else None
-        except json.JSONDecodeError:
-            return None
+    def _is_branded_item(item: dict) -> bool:
+        brand_owner = str(item.get("brandOwner", "") or "").strip()
+        data_type = str(item.get("dataType", "") or "").lower()
+        return bool(brand_owner) or "branded" in data_type
 
     def _fallback_edamam(self, food_name: str) -> dict | None:
         """
@@ -239,51 +229,6 @@ class UsdaResource:
             }
         except Exception as exc:
             logger.warning(f"Fallback Edamam no disponible para '{food_name}': {exc}")
-            return None
-
-    def _fallback_gemini(self, food_name: str) -> dict | None:
-        """
-        Último fallback por ingrediente: estimar carbs/100g con Gemini.
-        """
-        api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            logger.warning("Fallback Gemini omitido: GEMINI_API_KEY no configurado")
-            return None
-
-        model_name = os.getenv("GEMINI_NUTRITION_FALLBACK_MODEL", "gemini-2.5-flash")
-        prompt = f"""
-You are a nutrition estimation assistant.
-Estimate total carbohydrates per 100 grams for this ingredient: "{food_name}".
-Return ONLY valid JSON with this exact shape:
-{{"name":"<normalized ingredient>", "carbs_per_100g": <number>}}
-Rules:
-- carbs_per_100g must be a non-negative number.
-- name should be concise and in English.
-"""
-        try:
-            safe_library_call(genai.configure, api_key=api_key)
-            model = genai.GenerativeModel(model_name)
-            response = safe_library_call(model.generate_content, prompt)
-            parsed = self._extract_first_json_object(getattr(response, "text", "") or "")
-            if not parsed:
-                logger.warning(f"Fallback Gemini devolvió JSON inválido para '{food_name}'")
-                return None
-
-            resolved_name = self._normalize_food_name(str(parsed.get("name") or food_name))
-            carbs = float(parsed.get("carbs_per_100g", 0.0) or 0.0)
-            if carbs < 0:
-                carbs = 0.0
-
-            logger.info(
-                f"Fallback Gemini exitoso para '{food_name}' -> '{resolved_name}' carbs={carbs}"
-            )
-            return {
-                "name": resolved_name,
-                "carbs": carbs,
-                "unit": "G",
-            }
-        except Exception as exc:
-            logger.warning(f"Fallback Gemini no disponible para '{food_name}': {exc}")
             return None
 
     def get_food_by_name(self, food_name: str) -> dict:
@@ -316,8 +261,9 @@ Rules:
 
             food_data = response.json()
             foods = food_data.get("foods") or []
+            foods = [item for item in foods if not self._is_branded_item(item)]
             if not foods:
-                logger.warning(f"USDA sin resultados para query='{query}'")
+                logger.warning(f"USDA sin resultados no-branded para query='{query}'")
                 continue
 
             best_match = self._pick_best_food_match(query, foods)
@@ -350,14 +296,10 @@ Rules:
             f"Candidatos probados: {query_candidates}. Último status={last_status}"
         )
 
-        # Fallback por ingrediente (sin romper todo el análisis por un ítem).
+        # Fallback por ingrediente: probar Edamam (sin usar estimación inventada).
         edamam_fallback = self._fallback_edamam(food_name)
         if edamam_fallback is not None:
             return edamam_fallback
-
-        gemini_fallback = self._fallback_gemini(food_name)
-        if gemini_fallback is not None:
-            return gemini_fallback
 
         raise HTTPException(
             status_code=404,
@@ -391,7 +333,15 @@ Rules:
                     raise e
 
                 logger.info(f"Consultando USDA para nuevo ingrediente: '{normalized_food}'")
-                usda_food_data = self.get_food_by_name(normalized_food)
+                try:
+                    usda_food_data = self.get_food_by_name(normalized_food)
+                except HTTPException as lookup_exc:
+                    if lookup_exc.status_code == 404:
+                        logger.warning(
+                            f"Ingrediente omitido por falta de match en USDA/Edamam: '{normalized_food}'"
+                        )
+                        continue
+                    raise
                 normalized_api_food_name = self._normalize_food_name(usda_food_data.get("name", normalized_food))
                 carbs_per_hundred = usda_food_data["carbs"]
                 self.create_ingredient(meal_plate.id, normalized_api_food_name, carbs_per_hundred)

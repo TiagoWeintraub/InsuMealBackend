@@ -4,6 +4,7 @@ import re
 import logging
 import unicodedata
 import math
+from datetime import datetime, timezone
 
 import google.generativeai as genai
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -14,6 +15,7 @@ from auth.dependencies import get_current_user
 from database import get_session
 from models.meal_plate import MealPlate
 from models.user import User
+from models.usage import Usage
 from resources.ingredient_resource import IngredientResource
 from resources.nutrition_resource import NutritionResource
 from utils.suppress_output import safe_library_call
@@ -35,6 +37,7 @@ SPANISH_TO_ENGLISH_FOOD_MAP = {
     "carne": "beef",
     "pan": "bread",
     "arroz": "rice",
+    "mayonesa": "mayonnaise",
     "galleta": "cookie",
 }
 
@@ -49,8 +52,16 @@ WORD_TO_ENGLISH_MAP = {
     "carne": "beef",
     "pan": "bread",
     "arroz": "rice",
+    "mayonesa": "mayonnaise",
     "galleta": "cookie",
 }
+
+PORTION_MODEL_FALLBACK_ORDER = [
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-flash",
+    "gemini-3-flash-preview",
+    "gemini-3.1-flash-lite-preview",
+]
 
 SWEET_INGREDIENT_KEYWORDS = (
     "cookie",
@@ -89,24 +100,110 @@ def setup_gemini():
     return genai.GenerativeModel("gemini-2.0-flash-lite")
 
 
-def estimate_food_portions_with_gemini(food_list: list, meal_plate_name: str) -> dict:
-    try:
-        model = setup_gemini()
-        foods_text = ", ".join(food_list)
-        prompt = f"""
+def _register_usage_from_gemini_response(
+    session: Session,
+    user_id: int,
+    response,
+    model_name: str,
+) -> None:
+    usage = getattr(response, "usage_metadata", None)
+    prompt_tokens = int(getattr(usage, "prompt_token_count", 0) or 0)
+    completion_tokens = int(getattr(usage, "candidates_token_count", 0) or 0)
+    total_tokens = int(getattr(usage, "total_token_count", 0) or 0)
+
+    usage_record = Usage(
+        user_id=user_id,
+        provider="google",
+        model_name=model_name,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        total_tokens=total_tokens,
+        created_at=datetime.now(timezone.utc),
+    )
+    session.add(usage_record)
+    session.commit()
+
+
+def estimate_food_portions_with_gemini(
+    food_list: list,
+    meal_plate_name: str,
+    session: Session,
+    user_id: int,
+) -> dict | None:
+    foods_text = ", ".join(food_list)
+    prompt = f"""
 Estimate grams for the following ingredient(s) in this dish.
 Dish: {meal_plate_name}
 Ingredients: {foods_text}
 Return only a valid JSON object where each key is ingredient name and each value is integer grams.
 """
-        response = safe_library_call(model.generate_content, prompt)
-        clean_response = clean_gemini_response(response.text)
-        estimated_portions = json.loads(clean_response)
-        if isinstance(estimated_portions, dict):
-            return estimated_portions
-        return {food: 100 for food in food_list}
-    except Exception:
-        return {food: 100 for food in food_list}
+    last_error = None
+
+    for model_name in PORTION_MODEL_FALLBACK_ORDER:
+        try:
+            api_key = os.getenv("GEMINI_API_KEY")
+            if not api_key:
+                raise ValueError("GEMINI_API_KEY no está definido en el .env")
+            safe_library_call(genai.configure, api_key=api_key)
+            model = genai.GenerativeModel(model_name)
+            response = safe_library_call(model.generate_content, prompt)
+            _register_usage_from_gemini_response(
+                session=session,
+                user_id=user_id,
+                response=response,
+                model_name=model_name,
+            )
+            clean_response = clean_gemini_response(response.text)
+            estimated_portions = json.loads(clean_response)
+            if isinstance(estimated_portions, dict):
+                logger.info(f"Estimación de porción resuelta con modelo: {model_name}")
+                return estimated_portions
+        except Exception as exc:
+            last_error = exc
+            logger.warning(
+                f"Estimación de porción falló con modelo {model_name}: {exc}"
+            )
+            continue
+
+    logger.warning(f"No se pudo estimar porción con Gemini. Último error: {last_error}")
+    return None
+
+
+def _estimate_portion_with_heuristics(food_name: str, meal_plate_name: str) -> float | None:
+    normalized_food = normalize_food_name(food_name)
+    normalized_meal = normalize_food_name(meal_plate_name)
+
+    condiment_keywords = ("ketchup", "mayonnaise", "mustard", "barbecue", "salsa", "soy sauce")
+    sauce_keywords = ("sauce", "dressing", "dip")
+
+    if any(keyword in normalized_food for keyword in condiment_keywords):
+        return 8.0
+    if any(keyword in normalized_food for keyword in sauce_keywords):
+        return 15.0
+    if "cheddar cheese" in normalized_food or "mozzarella cheese" in normalized_food:
+        return 30.0
+
+    if "hamburger" in normalized_meal or "burger" in normalized_meal:
+        if "onion" in normalized_food or "pickle" in normalized_food or "tomato" in normalized_food:
+            return 15.0
+        if "lettuce" in normalized_food:
+            return 10.0
+
+    return None
+
+
+def _extract_estimated_weight(estimated_portions: dict, candidates: list[str]) -> float | None:
+    normalized_candidates = [normalize_food_name(candidate) for candidate in candidates if candidate]
+    for key, value in estimated_portions.items():
+        normalized_key = normalize_food_name(str(key))
+        if normalized_key in normalized_candidates:
+            try:
+                grams = float(value)
+            except (TypeError, ValueError):
+                continue
+            if math.isfinite(grams) and grams > 0:
+                return grams
+    return None
 
 
 def normalize_food_name(food_name: str) -> str:
@@ -116,7 +213,12 @@ def normalize_food_name(food_name: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
-def translate_food_to_english(food_name: str, meal_plate_name: str) -> str:
+def translate_food_to_english(
+    food_name: str,
+    meal_plate_name: str,
+    session: Session,
+    user_id: int,
+) -> str:
     """
     Similar a la lógica histórica: intenta llevar el alimento a un nombre corto en inglés.
     Si falla Gemini, devuelve el nombre normalizado original.
@@ -150,6 +252,12 @@ Input ingredient: {normalized}
 Return only valid JSON with shape: {{"food_en":"..."}}
 """
         response = safe_library_call(model.generate_content, prompt)
+        _register_usage_from_gemini_response(
+            session=session,
+            user_id=user_id,
+            response=response,
+            model_name="gemini-2.0-flash-lite",
+        )
         clean_response = clean_gemini_response(response.text or "")
         parsed = json.loads(clean_response)
         translated = normalize_food_name(str(parsed.get("food_en", "")))
@@ -208,7 +316,12 @@ async def process_single_food(
     if not meal_plate:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="MealPlate no encontrado")
 
-    translated_food = translate_food_to_english(normalized_input, meal_plate.type or "")
+    translated_food = translate_food_to_english(
+        normalized_input,
+        meal_plate.type or "",
+        session=session,
+        user_id=current_user.id,
+    )
     if not translated_food:
         translated_food = normalized_input
 
@@ -265,18 +378,40 @@ async def process_single_food(
         if e.status_code == 409:
             raise
 
-    estimated_portions = estimate_food_portions_with_gemini([translated_food], meal_plate.type)
-    raw_estimated_weight = estimated_portions.get(translated_food, 100)
-    try:
-        estimated_weight = float(raw_estimated_weight)
-    except (TypeError, ValueError):
-        estimated_weight = 100.0
-
-    if not math.isfinite(estimated_weight) or estimated_weight <= 0:
-        logger.warning(
-            f"Peso estimado inválido para '{translated_food}': {raw_estimated_weight}. Se usa 100g."
+    estimated_weight: float | None = None
+    estimated_portions = estimate_food_portions_with_gemini(
+        [translated_food],
+        meal_plate.type or "",
+        session=session,
+        user_id=current_user.id,
+    )
+    if isinstance(estimated_portions, dict):
+        estimated_weight = _extract_estimated_weight(
+            estimated_portions,
+            [translated_food, normalized_input],
         )
-        estimated_weight = 100.0
+
+    if estimated_weight is None:
+        estimated_weight = _estimate_portion_with_heuristics(translated_food, meal_plate.type or "")
+        if estimated_weight is not None:
+            logger.info(
+                f"Porción estimada con heurística para '{translated_food}' en '{meal_plate.type}': {estimated_weight}g"
+            )
+
+    if estimated_weight is None:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "portion_estimation_failed",
+                "message": (
+                    f"No se pudo estimar los gramos para '{food_name}' de forma confiable. "
+                    "Intenta con otro alimento o una descripción más específica."
+                ),
+                "original_food": food_name,
+                "translated_food": translated_food,
+                "meal_type": meal_plate.type,
+            },
+        )
 
     food_with_weight = {translated_food: estimated_weight}
 
