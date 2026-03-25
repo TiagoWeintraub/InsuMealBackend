@@ -2,10 +2,7 @@
 Configuración central para suprimir salidas no deseadas de librerías problemáticas.
 
 Este módulo debe ser importado al inicio de cualquier archivo que use:
-- argostranslate
 - google.generativeai
-- langdetect
-- ctranslate2
 - transformers
 - tensorflow
 """
@@ -19,9 +16,6 @@ from contextlib import redirect_stdout, redirect_stderr
 
 def configure_logging():
     """Configura el logging para suprimir salidas de librerías problemáticas"""
-    # Configurar logging para suprimir salidas de librerías de traducción
-    logging.getLogger('argostranslate').setLevel(logging.CRITICAL)
-    logging.getLogger('ctranslate2').setLevel(logging.CRITICAL)
     logging.getLogger('transformers').setLevel(logging.CRITICAL)
     
     # Configurar logging para suprimir salidas de Google APIs
@@ -30,9 +24,6 @@ def configure_logging():
     logging.getLogger('google.auth').setLevel(logging.CRITICAL)
     logging.getLogger('google.api_core').setLevel(logging.CRITICAL)
     logging.getLogger('googleapiclient').setLevel(logging.CRITICAL)
-    
-    # Configurar logging para suprimir salidas de langdetect
-    logging.getLogger('langdetect').setLevel(logging.CRITICAL)
     
     # Configurar logging para suprimir salidas de SQLAlchemy
     logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
@@ -112,7 +103,7 @@ def safe_library_call(func, *args, **kwargs):
     Ejecuta una función suprimiendo su salida.
     
     Uso:
-    result = safe_library_call(argostranslate.translate.translate, text, "es", "en")
+    result = safe_library_call(alguna_funcion_ruidosa, arg1, kw=...)
     """
     with io.StringIO() as buf, redirect_stdout(buf), redirect_stderr(buf):
         return func(*args, **kwargs)

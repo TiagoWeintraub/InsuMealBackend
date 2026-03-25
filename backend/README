@@ -3,7 +3,8 @@
 2 Verificar servicio de postgres
 ps aux | grep postgres
 
-3 Levantar el server:
+3 Levantar el server (desde el directorio backend/):
+cd backend
 uvicorn __init__:app --reload
 uvicorn __init__:app --reload --host 0.0.0.0 --port 8000
 

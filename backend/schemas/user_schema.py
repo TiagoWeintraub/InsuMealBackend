@@ -42,3 +42,54 @@ class PasswordChange(BaseModel):
 class LoginInput(BaseModel):
     email: EmailStr
     password: str
+
+
+class AdminUserUpdate(BaseModel):
+    name: Optional[str] = None
+    lastName: Optional[str] = None
+    email: Optional[EmailStr] = None
+    role: Optional[str] = None  # "admin" | "user"
+
+
+class AdminUserRead(BaseModel):
+    id: int
+    name: str
+    lastName: str
+    email: EmailStr
+    role: str
+
+
+class UsageBreakdownItem(BaseModel):
+    provider: str
+    model_name: str
+    requests: int
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+
+
+class UserUsageSummary(BaseModel):
+    user_id: int
+    total_requests: int
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+    breakdown: list[UsageBreakdownItem]
+
+
+class AdminUsersPagination(BaseModel):
+    page: int
+    page_size: int
+    total_items: int
+    total_pages: int
+    has_next: bool
+    has_previous: bool
+
+
+class AdminUsersPaginatedResponse(BaseModel):
+    items: list[AdminUserRead]
+    pagination: AdminUsersPagination
+
+
+class UserCountResponse(BaseModel):
+    total_users: int
