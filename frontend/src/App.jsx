@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import "./App.css";
 
 const runtimeApiBaseUrl = window.__INSUMEAL_CONFIG__?.API_BASE_URL;
-const API_BASE_URL = runtimeApiBaseUrl || import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+const envApiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+const API_BASE_URL = envApiBaseUrl || runtimeApiBaseUrl || "http://localhost:8000";
 const PAGE_SIZE = 10;
 const TOKEN_STORAGE_KEY = "insumeal_admin_token";
 const LOGO_SRC = "/logo-insumeal.png";
@@ -389,16 +390,20 @@ function App() {
             <>
               <div className="usage-summary">
                 <p>
-                  Cantidad de requests: <strong>{usageData.total_requests}</strong>
+                  <span className="usage-summary-label">Cantidad de requests:</span>
+                  <strong className="usage-summary-value">{usageData.total_requests}</strong>
                 </p>
                 <p>
-                  Prompt tokens: <strong>{usageData.prompt_tokens}</strong>
+                  <span className="usage-summary-label">Input tokens:</span>
+                  <strong className="usage-summary-value">{usageData.prompt_tokens}</strong>
                 </p>
                 <p>
-                  Completion tokens: <strong>{usageData.completion_tokens}</strong>
+                  <span className="usage-summary-label">Output tokens:</span>
+                  <strong className="usage-summary-value">{usageData.completion_tokens}</strong>
                 </p>
                 <p>
-                  Total tokens: <strong>{usageData.total_tokens}</strong>
+                  <span className="usage-summary-label">Total tokens:</span>
+                  <strong className="usage-summary-value">{usageData.total_tokens}</strong>
                 </p>
               </div>
               <div className="table-wrap">
@@ -408,8 +413,8 @@ function App() {
                       <th>Provider</th>
                       <th>Modelo</th>
                       <th>Requests</th>
-                      <th>Prompt</th>
-                      <th>Completion</th>
+                      <th>Input</th>
+                      <th>Output</th>
                       <th>Total</th>
                     </tr>
                   </thead>

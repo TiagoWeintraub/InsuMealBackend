@@ -9,6 +9,19 @@ class FoodHistoryResource:
     def __init__(self, session: Session):
         self.session = session
 
+    @staticmethod
+    def _serialize_meal_plate_item(meal_plate: MealPlate) -> dict:
+        return {
+            "id": meal_plate.id,
+            "date": meal_plate.date.strftime("%d/%m/%Y - %H:%M"),
+            "type": meal_plate.type,
+            "totalCarbs": meal_plate.totalCarbs,
+            "glycemia": meal_plate.glycemia,
+            "dosis": meal_plate.dosis,
+            "food_history_id": meal_plate.food_history_id,
+            "image_url": f"/meal_plate/image/{meal_plate.id}",
+        }
+
     def create(self, data: FoodHistoryCreate) -> FoodHistory:
         food_history = FoodHistory(**data.model_dump())
         self.session.add(food_history)
@@ -68,8 +81,10 @@ class FoodHistoryResource:
             has_previous=has_previous
         )
         
+        serialized_items = [self._serialize_meal_plate_item(plate) for plate in meal_plates]
+
         return PaginatedResponse(
-            items=meal_plates,
+            items=serialized_items,
             pagination=pagination_metadata
         )
 
