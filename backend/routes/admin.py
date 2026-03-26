@@ -6,11 +6,13 @@ from database import get_session
 from models.user import User
 from resources.user_resource import UserResource
 from schemas.user_schema import (
+    ActiveUsersMetricsResponse,
     AdminUserRead,
     AdminUserUpdate,
-    UserUsageSummary,
     AdminUsersPaginatedResponse,
+    UsageByDayPartResponse,
     UserCountResponse,
+    UserUsageSummary,
 )
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
@@ -66,3 +68,19 @@ async def admin_get_user_usage(
     session: Session = Depends(get_session),
 ):
     return UserResource.get_user_usage_summary(user_id, session)
+
+
+@router.get("/metrics/active-users", response_model=ActiveUsersMetricsResponse)
+async def admin_get_active_users_metrics(
+    _: User = Depends(get_current_admin),
+    session: Session = Depends(get_session),
+):
+    return UserResource.get_active_users_metrics(session)
+
+
+@router.get("/metrics/usage-by-daypart", response_model=UsageByDayPartResponse)
+async def admin_get_usage_by_daypart(
+    _: User = Depends(get_current_admin),
+    session: Session = Depends(get_session),
+):
+    return UserResource.get_usage_by_day_part(session)

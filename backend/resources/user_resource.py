@@ -1,6 +1,7 @@
 from sqlmodel import Session, select
 from fastapi import HTTPException, status
-from sqlalchemy import func, or_
+from sqlalchemy import case, func, or_
+from datetime import datetime, timedelta, timezone
 import math
 from models.user import User
 from models.role import Role
@@ -271,6 +272,66 @@ class UserResource:
                 "has_previous": page > 1,
             },
         }
+
+    @staticmethod
+    def get_active_users_metrics(session: Session):
+        now_utc = datetime.now(timezone.utc)
+        windows = [1, 7, 30]
+        result = []
+
+        for days in windows:
+            cutoff = now_utc - timedelta(days=days)
+            active_users = int(
+                session.exec(
+                    select(func.count(func.distinct(Usage.user_id))).where(
+                        Usage.created_at >= cutoff
+                    )
+                ).one()
+                or 0
+            )
+            result.append({"window_days": days, "active_users": active_users})
+
+        return {"windows": result}
+
+    @staticmethod
+    def get_usage_by_day_part(session: Session):
+        hour = func.extract("hour", Usage.created_at)
+        segment_case = case(
+            (hour < 12, "morning"),
+            (hour < 15, "midday"),
+            (hour < 20, "afternoon"),
+            else_="night",
+        )
+
+        rows = session.exec(
+            select(segment_case.label("segment"), func.count(Usage.id))
+            .group_by(segment_case)
+        ).all()
+
+        requests_map = {str(segment): int(count or 0) for segment, count in rows}
+        labels = {
+            "morning": "Mañana (00:00-11:59)",
+            "midday": "Mediodía (12:00-14:59)",
+            "afternoon": "Tarde (15:00-19:59)",
+            "night": "Noche (20:00-23:59)",
+        }
+        ordered_keys = ["morning", "midday", "afternoon", "night"]
+
+        total_requests = sum(requests_map.get(k, 0) for k in ordered_keys)
+        segments = []
+        for key in ordered_keys:
+            requests = requests_map.get(key, 0)
+            percentage = (requests / total_requests * 100.0) if total_requests > 0 else 0.0
+            segments.append(
+                {
+                    "key": key,
+                    "label": labels[key],
+                    "requests": requests,
+                    "percentage": round(percentage, 2),
+                }
+            )
+
+        return {"total_requests": total_requests, "segments": segments}
 
     @staticmethod
     def change_password(data: PasswordChange, current_user: User, session: Session):
