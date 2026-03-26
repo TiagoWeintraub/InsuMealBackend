@@ -12,5 +12,11 @@ uvicorn __init__:app --reload --host 0.0.0.0 --port 8000
     1. Opción para ver todas las ip: ifconfig | grep inet 
     2. Para obtener solo la ip de mi pc: ipconfig getifaddr en0 
 
-5 Si se necesita exponer el server con ngrok
-ngrok http 
+5 Exponer el frontend a mi red local
+npm run dev -- --host 0.0.0.0 --port 5173
+
+Para entrar con otro dispositivo en la red local
+http://IP_DE_LA_PC:5173
+
+Solo a mi pc
+npm run dev

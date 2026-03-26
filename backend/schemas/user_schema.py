@@ -93,3 +93,24 @@ class AdminUsersPaginatedResponse(BaseModel):
 
 class UserCountResponse(BaseModel):
     total_users: int
+
+
+class ActiveUsersWindowItem(BaseModel):
+    window_days: int
+    active_users: int
+
+
+class ActiveUsersMetricsResponse(BaseModel):
+    windows: list[ActiveUsersWindowItem]
+
+
+class UsageByDayPartItem(BaseModel):
+    key: str
+    label: str
+    requests: int
+    percentage: float
+
+
+class UsageByDayPartResponse(BaseModel):
+    total_requests: int
+    segments: list[UsageByDayPartItem]

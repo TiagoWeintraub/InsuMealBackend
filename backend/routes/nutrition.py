@@ -169,6 +169,71 @@ Return only a valid JSON object where each key is ingredient name and each value
     return None
 
 
+def infer_food_and_portion_with_gemini(
+    original_food: str,
+    translated_food: str,
+    meal_plate_name: str,
+    session: Session,
+    user_id: int,
+) -> tuple[str | None, float | None]:
+    prompt = f"""
+You are helping a diabetes meal app.
+Given one ingredient and a dish context, return a canonical English ingredient name and grams.
+
+Dish: {meal_plate_name}
+User ingredient (original): {original_food}
+Current normalized translation: {translated_food}
+
+Rules:
+- Return ONLY valid JSON with shape: {{"food_en":"...", "grams": number}}
+- food_en must be a generic ingredient name (no brands).
+- Keep same ingredient meaning (do not replace with a different ingredient).
+- grams must be a positive number, realistic for ONE portion in the given dish context.
+"""
+    last_error = None
+
+    for model_name in PORTION_MODEL_FALLBACK_ORDER:
+        try:
+            api_key = os.getenv("GEMINI_API_KEY")
+            if not api_key:
+                raise ValueError("GEMINI_API_KEY no está definido en el .env")
+            safe_library_call(genai.configure, api_key=api_key)
+            model = genai.GenerativeModel(model_name)
+            response = safe_library_call(model.generate_content, prompt)
+            _register_usage_from_gemini_response(
+                session=session,
+                user_id=user_id,
+                response=response,
+                model_name=model_name,
+            )
+
+            parsed = json.loads(clean_gemini_response(response.text or ""))
+            if not isinstance(parsed, dict):
+                continue
+
+            food_en = normalize_food_name(str(parsed.get("food_en") or ""))
+            grams_raw = parsed.get("grams")
+            grams = None
+            try:
+                grams = float(grams_raw)
+            except (TypeError, ValueError):
+                grams = None
+
+            if grams is not None and (not math.isfinite(grams) or grams <= 0):
+                grams = None
+
+            return (food_en or None, grams)
+        except Exception as exc:
+            last_error = exc
+            logger.warning(
+                f"Inferencia food+grams falló con modelo {model_name}: {exc}"
+            )
+            continue
+
+    logger.warning(f"No se pudo inferir food+grams con Gemini. Último error: {last_error}")
+    return (None, None)
+
+
 def _estimate_portion_with_heuristics(food_name: str, meal_plate_name: str) -> float | None:
     normalized_food = normalize_food_name(food_name)
     normalized_meal = normalize_food_name(meal_plate_name)
@@ -329,6 +394,19 @@ async def process_single_food(
         f"Procesando alimento manual. original='{food_name}' normalized='{normalized_input}' translated='{translated_food}'"
     )
 
+    inferred_food, inferred_grams = infer_food_and_portion_with_gemini(
+        original_food=normalized_input,
+        translated_food=translated_food,
+        meal_plate_name=meal_plate.type or "",
+        session=session,
+        user_id=current_user.id,
+    )
+    if inferred_food:
+        logger.info(
+            f"Inferencia canónica de ingrediente aplicada: '{translated_food}' -> '{inferred_food}'"
+        )
+        translated_food = inferred_food
+
     if not is_food_compatible_with_meal_context(translated_food, meal_plate.type or ""):
         logger.info(
             f"Ingrediente fuera de contexto. food='{translated_food}' meal_type='{meal_plate.type}'"
@@ -378,18 +456,20 @@ async def process_single_food(
         if e.status_code == 409:
             raise
 
-    estimated_weight: float | None = None
-    estimated_portions = estimate_food_portions_with_gemini(
-        [translated_food],
-        meal_plate.type or "",
-        session=session,
-        user_id=current_user.id,
-    )
-    if isinstance(estimated_portions, dict):
-        estimated_weight = _extract_estimated_weight(
-            estimated_portions,
-            [translated_food, normalized_input],
+    estimated_weight: float | None = inferred_grams
+
+    if estimated_weight is None:
+        estimated_portions = estimate_food_portions_with_gemini(
+            [translated_food],
+            meal_plate.type or "",
+            session=session,
+            user_id=current_user.id,
         )
+        if isinstance(estimated_portions, dict):
+            estimated_weight = _extract_estimated_weight(
+                estimated_portions,
+                [translated_food, normalized_input],
+            )
 
     if estimated_weight is None:
         estimated_weight = _estimate_portion_with_heuristics(translated_food, meal_plate.type or "")

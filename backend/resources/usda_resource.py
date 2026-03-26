@@ -62,7 +62,7 @@ class UsdaResource:
         self.session = session
         self.app_key = os.getenv("USDA_API_KEY")
         self.data_type = os.getenv("USDA_DATA_TYPE", "SR Legacy")
-        self.page_size = 1
+        self.page_size = int(os.getenv("USDA_PAGE_SIZE", "50"))
         if not self.app_key:
             raise ValueError("USDA_API_KEY no está definido en el .env")
         self.base_url = os.getenv("USDA_URL", "https://api.nal.usda.gov/fdc/v1/foods/search")
@@ -87,6 +87,16 @@ class UsdaResource:
             0.0,
         )
         return float(carbs or 0.0)
+
+    def _canonical_ingredient_name(self, requested_name: str, fallback_name: str = "") -> str:
+        """
+        Mantiene nombres simples y estables para el dominio de la app.
+        USDA/Edamam se usan para obtener carbos, no para imponer etiquetas largas.
+        """
+        canonical = self._normalize_food_name(requested_name)
+        if canonical:
+            return canonical
+        return self._normalize_food_name(fallback_name)
 
     def _pick_best_food_match(self, query: str, foods: list[dict]) -> dict | None:
         """
@@ -134,13 +144,15 @@ class UsdaResource:
                 score += 120.0
             if desc_singular == query_singular:
                 score += 80.0
+            if query_tokens and query_tokens.issubset(desc_tokens):
+                score += 30.0
             if description.startswith(normalized_query):
                 score += 25.0
             if normalized_query in description:
                 score += 18.0
 
             score += jaccard * 40.0
-            score -= max(0, len(desc_tokens) - len(query_tokens)) * 2.5
+            score -= max(0, len(desc_tokens) - len(query_tokens)) * 4.0
             score -= sum(1 for token in desc_tokens if token in noisy_tokens) * 10.0
 
             brand_owner = str(item.get("brandOwner", "") or "").strip()
@@ -155,7 +167,28 @@ class UsdaResource:
             if any(x in data_type for x in ("foundation", "survey", "sr legacy", "legacy")):
                 score += 10.0
 
+            # Penaliza resultados con demasiados tokens adicionales cuando la query es corta.
+            if len(query_tokens) <= 2 and len(desc_tokens) >= 5:
+                score -= 12.0
+
             return (score, description)
+
+        # Fast-path estricto: si hay match exacto/singular-plural, elegirlo sí o sí.
+        exact_candidates = []
+        for item in foods:
+            desc = self._normalize_food_name(str(item.get("description", "") or ""))
+            if not desc:
+                continue
+            desc_singular = desc.rstrip("s")
+            if desc == normalized_query or desc_singular == query_singular:
+                exact_candidates.append((len(desc.split()), desc, item))
+        if exact_candidates:
+            exact_candidates.sort(key=lambda x: x[0])
+            chosen = exact_candidates[0][2]
+            logger.info(
+                f"USDA exact_match query='{normalized_query}' picked='{self._normalize_food_name(str(chosen.get('description') or ''))}'"
+            )
+            return chosen
 
         ranked: list[tuple[float, str, dict]] = []
         for item in foods:
@@ -218,14 +251,21 @@ class UsdaResource:
             edamam = EdamamResource(self.session, self.current_user)
             data = edamam.post_food_by_natural_language(food_name, grams=100.0)
             carbs = float(data.get("carbs", 0.0) or 0.0)
-            resolved_name = self._normalize_food_name(str(data.get("food_name") or food_name))
+            source_name = self._normalize_food_name(str(data.get("food_name") or food_name))
+            canonical_name = self._canonical_ingredient_name(food_name, source_name)
+            if len(source_name.split()) > 6:
+                logger.warning(
+                    f"Fallback Edamam descartado por nombre demasiado específico: '{source_name}'"
+                )
+                return None
             logger.info(
-                f"Fallback Edamam exitoso para '{food_name}' -> '{resolved_name}' carbs={carbs}"
+                f"Fallback Edamam exitoso para '{food_name}' -> canonical='{canonical_name}' source='{source_name}' carbs={carbs}"
             )
             return {
-                "name": resolved_name,
+                "name": canonical_name,
                 "carbs": carbs,
                 "unit": "G",
+                "source_name": source_name,
             }
         except Exception as exc:
             logger.warning(f"Fallback Edamam no disponible para '{food_name}': {exc}")
@@ -243,7 +283,7 @@ class UsdaResource:
                 "api_key": self.app_key,
                 "query": query,
                 "dataType": self.data_type,
-                "pageSize": 10,
+                "pageSize": self.page_size,
             }
             response = requests.get(self.base_url, params=params, timeout=15)
             last_status = response.status_code
@@ -282,13 +322,15 @@ class UsdaResource:
                 "G",
             )
             resolved_name = self._normalize_food_name(str(best_match.get("description") or query))
+            canonical_name = self._canonical_ingredient_name(food_name, query)
             logger.info(
-                f"USDA match query='{query}' resolved_name='{resolved_name}' carbs={carbs}"
+                f"USDA match query='{query}' source_name='{resolved_name}' canonical_name='{canonical_name}' carbs={carbs}"
             )
             return {
-                "name": resolved_name,
+                "name": canonical_name,
                 "carbs": float(carbs or 0.0),
                 "unit": carbsUnit,
+                "source_name": resolved_name,
             }
 
         logger.warning(
