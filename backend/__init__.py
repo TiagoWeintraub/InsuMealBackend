@@ -1,4 +1,5 @@
 import os
+import re
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routes.gemini import router as gemini_router
@@ -34,9 +35,33 @@ cors_origins_raw = os.getenv(
 )
 cors_origins = [origin.strip() for origin in cors_origins_raw.split(",") if origin.strip()]
 
+allow_lan_origins = os.getenv("CORS_ALLOW_PRIVATE_LAN", "false").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+    "on",
+)
+lan_ports_raw = os.getenv("CORS_PRIVATE_LAN_PORTS", "5173,3000")
+lan_ports = [p.strip() for p in lan_ports_raw.split(",") if p.strip().isdigit()]
+lan_ports_pattern = "|".join(lan_ports) if lan_ports else "5173|3000"
+
+private_lan_origin_regex = (
+    rf"^https?://("
+    rf"10(?:\.\d{{1,3}}){{3}}|"
+    rf"192\.168(?:\.\d{{1,3}}){{2}}|"
+    rf"172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{{1,3}}){{2}}"
+    rf"):(?:{lan_ports_pattern})$"
+)
+
+allow_origin_regex = private_lan_origin_regex if allow_lan_origins else None
+if allow_origin_regex:
+    # Validate final regex once at startup to fail early if malformed.
+    re.compile(allow_origin_regex)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
+    allow_origin_regex=allow_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

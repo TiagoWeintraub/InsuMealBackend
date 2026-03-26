@@ -15,7 +15,32 @@ import "./App.css";
 
 const runtimeApiBaseUrl = window.__INSUMEAL_CONFIG__?.API_BASE_URL;
 const envApiBaseUrl = import.meta.env.VITE_API_BASE_URL;
-const API_BASE_URL = envApiBaseUrl || runtimeApiBaseUrl || "http://localhost:8000";
+const configuredApiBaseUrl = envApiBaseUrl || runtimeApiBaseUrl || "http://localhost:8000";
+
+function resolveApiBaseUrl(baseUrl) {
+  if (typeof window === "undefined") return baseUrl;
+  try {
+    const parsed = new URL(baseUrl);
+    const isLoopback =
+      parsed.hostname === "localhost" ||
+      parsed.hostname === "127.0.0.1" ||
+      parsed.hostname === "::1";
+    const currentHostIsLoopback =
+      window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1" ||
+      window.location.hostname === "::1";
+
+    // If frontend is opened from another device, replace loopback backend host with current LAN host.
+    if (isLoopback && !currentHostIsLoopback) {
+      return `${parsed.protocol}//${window.location.hostname}:8000`;
+    }
+    return baseUrl;
+  } catch {
+    return baseUrl;
+  }
+}
+
+const API_BASE_URL = resolveApiBaseUrl(configuredApiBaseUrl);
 const PAGE_SIZE = 10;
 const TOKEN_STORAGE_KEY = "insumeal_admin_token";
 const LOGO_SRC = "/logo-insumeal.png";
