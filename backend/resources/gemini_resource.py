@@ -623,34 +623,32 @@ class GeminiResource:
             logger.warning("No se encontró diccionario válido en la respuesta de Gemini")
             return {}
     
-    def reduce_image_weight(self, image_data: bytes, target_max_kb=500) -> bytes:
-        # Solo se reduce si la dimesion de la imagen es mayor a 300x300
-        if len(image_data) > 300 * 300:
-            target_max_bytes = target_max_kb * 1024
-            image = Image.open(io.BytesIO(image_data))
-            image = ImageOps.exif_transpose(image)
-            if image.mode != "RGB":
-                image = image.convert("RGB")
-            max_dimension = 1024  
-            if max(image.size) > max_dimension:
-                image.thumbnail((max_dimension, max_dimension), Resampling.LANCZOS)
-            quality = 90
+    def reduce_image_weight(self, image_data: bytes, target_max_kb: int = 1000) -> bytes:
+        # Hasta 1 MB se envía tal cual (cliente ya limita; preserva detalle para Gemini).
+        max_uncompressed = 1024 * 1024
+        if len(image_data) <= max_uncompressed:
+            logger.debug("Imagen <= 1 MB, sin compresión antes de Gemini")
+            return image_data
+
+        target_max_bytes = target_max_kb * 1024
+        image = Image.open(io.BytesIO(image_data))
+        image = ImageOps.exif_transpose(image)
+        if image.mode != "RGB":
+            image = image.convert("RGB")
+        max_dimension = 2048
+        if max(image.size) > max_dimension:
+            image.thumbnail((max_dimension, max_dimension), Resampling.LANCZOS)
+        quality = 92
+        output = io.BytesIO()
+        image.save(output, format="JPEG", quality=quality)
+        while output.tell() > target_max_bytes and quality > 20:
+            quality -= 5
             output = io.BytesIO()
             image.save(output, format="JPEG", quality=quality)
-            while output.tell() > target_max_bytes and quality > 10:
-                quality -= 5
-                output = io.BytesIO()
-                image.save(output, format="JPEG", quality=quality)
-            compressed_data = output.getvalue()
-            final_size_kb = len(compressed_data) / 1024
-            if image_data == compressed_data:
-                logger.debug("La imagen no requirió compresión")
-            else:
-                logger.info(f"Imagen comprimida: {final_size_kb:.2f} KB (calidad {quality}), dimensiones: {image.size}")
-            return compressed_data
-        else:
-            logger.debug("La imagen es demasiado pequeña para ser comprimida")
-            return image_data
+        compressed_data = output.getvalue()
+        final_size_kb = len(compressed_data) / 1024
+        logger.info(f"Imagen comprimida: {final_size_kb:.2f} KB (calidad {quality}), dimensiones: {image.size}")
+        return compressed_data
     
 
     def call_nutritional_api_resource(self, food_dic, meal_plate: MealPlate ,current_user: User) -> None:

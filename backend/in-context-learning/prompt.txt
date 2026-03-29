@@ -28,6 +28,7 @@ Your task is to analyze an image of a food dish and generate a single, clean Pyt
 
 *   **Context is King:** Use the main dish to infer ingredients. A bun in the context of a "Hamburger" is a "hamburger bun" (approx. 75g), which is different from a "toast" (approx. 40g).
 *   **Prioritize Conservative Estimation over Omission:** Since this is for diabetes management, **underestimating carbohydrates is dangerous.** If you see an ingredient but are uncertain of its exact weight, make a reasonable, conservative estimate. It is better to include a plausible weight than to omit the ingredient entirely.
+*   **Primary protein must appear in the ingredient list:** If the main dish is clearly fish, poultry, red meat, tofu, etc., that protein **must** appear as its own key (e.g. `"salmon"`, `"chicken breast"`, `"beef"`) with a gram estimate—**never** only in the main-dish title while skipping it among the ingredients. Purées, mashes, and sauces often cover more of the plate visually but are **not** a substitute for listing the visible fillet, cutlet, or piece of protein.
 *   **Condiments and Sauces Rule:**
     *   For dishes where sauce is a primary component (e.g., "bolognese sauce" for pasta, curry sauce), it **must** be included and estimated.
     *   For common condiments on items like burgers or fries (ketchup, mustard), only include them if a significant, non-standard amount is clearly visible. If so, use a conservative estimate (e.g., "ketchup": 15).
@@ -103,6 +104,14 @@ Image: A beef milanese with mashed potatoes.
   "beef": 130,
   "breadcrumbs": 35,
   "mashed potatoes": 200
+}
+
+Image: Pan-seared salmon fillet on a bed of green mashed vegetables.
+Note: The salmon is the main protein even though the mash may cover more area—list both the fish and the mash (and sauces/garnish if clearly visible).
+{
+  "Seared salmon": 1,
+  "salmon": 150,
+  "mashed vegetables": 220
 }
 
 Image: A flan with caramel

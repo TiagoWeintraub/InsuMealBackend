@@ -46,6 +46,13 @@ const TOKEN_STORAGE_KEY = "insumeal_admin_token";
 const LOGO_SRC = "/logo-insumeal.png";
 const METRIC_WINDOWS = [1, 7, 30];
 const DAY_PART_COLORS = ["#245be6", "#4d86ff", "#63b3ed", "#9f7aea"];
+/** Etiqueta corta para tooltip/gráfico; los horarios solo en la leyenda inferior (name). */
+const DAY_PART_SHORT_LABELS = {
+  morning: "Mañana",
+  midday: "Mediodía",
+  afternoon: "Tarde",
+  night: "Noche",
+};
 
 function App() {
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_STORAGE_KEY) || "");
@@ -104,11 +111,21 @@ function App() {
   );
   const dayPartChartData = useMemo(
     () =>
-      dayPartMetrics.map((segment) => ({
-        name: segment.label,
-        requests: segment.requests,
-        percentage: segment.percentage,
-      })),
+      dayPartMetrics.map((segment) => {
+        const key = segment.key || "";
+        const shortLabel =
+          DAY_PART_SHORT_LABELS[key] ||
+          String(segment.label || "")
+            .split(/\s*\(/)[0]
+            .trim() ||
+          segment.label;
+        return {
+          name: segment.label,
+          shortLabel,
+          requests: segment.requests,
+          percentage: segment.percentage,
+        };
+      }),
     [dayPartMetrics]
   );
 
@@ -574,7 +591,7 @@ function App() {
                         <Pie
                           data={dayPartChartData}
                           dataKey="requests"
-                          nameKey="name"
+                          nameKey="shortLabel"
                           cx="50%"
                           cy="50%"
                           outerRadius={104}
@@ -588,7 +605,7 @@ function App() {
                         <Tooltip
                           formatter={(value, _name, payload) => [
                             `${value} requests (${payload?.payload?.percentage || 0}%)`,
-                            payload?.payload?.name || "Segmento",
+                            payload?.payload?.shortLabel || "Segmento",
                           ]}
                         />
                       </PieChart>
@@ -739,7 +756,7 @@ function App() {
             <button className="btn danger" onClick={confirmDelete} disabled={deleteLoading}>
               {deleteLoading ? "Eliminando..." : "Eliminar"}
             </button>
-          </div>
+        </div>
         </Modal>
       ) : null}
     </main>
@@ -754,7 +771,7 @@ function Modal({ title, onClose, children }) {
           <h2>{title}</h2>
           <button className="btn small" onClick={onClose}>
             Cerrar
-          </button>
+        </button>
         </header>
         <div className="modal-body">{children}</div>
       </section>
@@ -769,8 +786,8 @@ function Brand({ title, subtitle }) {
       <div>
         <h1>{title}</h1>
         {subtitle ? <p className="muted">{subtitle}</p> : null}
-      </div>
-    </div>
+        </div>
+        </div>
   );
 }
 
